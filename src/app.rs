@@ -39,15 +39,17 @@ pub enum GlobalField {
     PreventSleep,
     CycleTime,
     HideStock,
+    VanityMode,
 }
 
 impl GlobalField {
-    pub const ALL: [GlobalField; 5] = [
+    pub const ALL: [GlobalField; 6] = [
         GlobalField::Active,
         GlobalField::Timeout,
         GlobalField::PreventSleep,
         GlobalField::CycleTime,
         GlobalField::HideStock,
+        GlobalField::VanityMode,
     ];
 }
 
@@ -55,6 +57,15 @@ impl GlobalField {
 pub enum StatusKind {
     Info,
     Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg(feature = "downloader")]
+pub enum PendingAction {
+    Apply,
+    ToggleSelection,
+    Preview,
+    Configure,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +96,14 @@ pub struct App {
     pub stars: Vec<Star>,
     pub term_width: u16,
     pub term_height: u16,
+    #[cfg(feature = "downloader")]
+    pub download_state: Option<std::sync::Arc<std::sync::Mutex<crate::downloader::DownloadState>>>,
+    #[cfg(feature = "downloader")]
+    pub registry_results: Option<std::sync::Arc<std::sync::Mutex<Option<Vec<crate::downloader::RegistryEntry>>>>>,
+    #[cfg(feature = "downloader")]
+    pub registry_entries: Vec<crate::downloader::RegistryEntry>,
+    #[cfg(feature = "downloader")]
+    pub pending_action: Option<PendingAction>,
 }
 
 impl App {
@@ -105,6 +124,23 @@ impl App {
             .unwrap_or(0)
             .min(screensavers.len().saturating_sub(1));
 
+        let vanity_enabled = local.vanity_mode;
+
+        #[cfg(feature = "downloader")]
+        let registry_results = {
+            let state = std::sync::Arc::new(std::sync::Mutex::new(None));
+            let thread_state = state.clone();
+            std::thread::spawn(move || {
+                let url = "https://raw.githubusercontent.com/UberMetroid/ssm/master/registry.json";
+                if let Ok(entries) = crate::downloader::fetch_registry(url) {
+                    if let Ok(mut lock) = thread_state.lock() {
+                        *lock = Some(entries);
+                    }
+                }
+            });
+            Some(state)
+        };
+
         let mut app = App {
             screensavers,
             highlighted,
@@ -119,11 +155,19 @@ impl App {
             filtering: false,
             list_offset: 0,
             list_items: Vec::new(),
-            vanity_enabled: false,
+            vanity_enabled,
             particles: Vec::new(),
             stars: Vec::new(),
             term_width: 80,
             term_height: 25,
+            #[cfg(feature = "downloader")]
+            download_state: None,
+            #[cfg(feature = "downloader")]
+            registry_results,
+            #[cfg(feature = "downloader")]
+            registry_entries: Vec::new(),
+            #[cfg(feature = "downloader")]
+            pending_action: None,
         };
         app.update_list_items();
         app
@@ -200,6 +244,10 @@ impl App {
                     s_filename.is_some() && s_filename == active_filename
                 };
                 let exists = s.path.exists();
+                #[cfg(feature = "downloader")]
+                let is_online = s.download_url.is_some();
+                #[cfg(not(feature = "downloader"))]
+                let is_online = false;
 
                 let prefix = if is_checked {
                     "[x] ".to_string()
@@ -230,6 +278,11 @@ impl App {
                         " [Applied]",
                         ratatui::style::Style::default().fg(theme.applied),
                     ));
+                } else if is_online {
+                    spans.push(ratatui::text::Span::styled(
+                        " [Online]",
+                        ratatui::style::Style::default().fg(theme.accent_secondary),
+                    ));
                 } else if !exists {
                     spans.push(ratatui::text::Span::styled(
                         " [Missing]",
@@ -247,6 +300,11 @@ impl App {
 
     /// Apply the currently-highlighted screensaver as the system screensaver.
     pub fn apply_highlighted(&mut self) {
+        #[cfg(feature = "downloader")]
+        if self.trigger_online_download(PendingAction::Apply) {
+            return;
+        }
+
         let exe = std::env::current_exe().unwrap_or_default();
 
         // If selected_paths is empty, automatically check the highlighted screensaver.
@@ -374,6 +432,34 @@ impl App {
         }
     }
 
+    /// Toggle vanity mode (fireworks / background stars) and persist it.
+    pub fn toggle_vanity_mode(&mut self) {
+        self.vanity_enabled = !self.vanity_enabled;
+        self.local.vanity_mode = self.vanity_enabled;
+        if let Some(s) = self.current_screensaver() {
+            if let Some(name) = s.path.file_name().and_then(|f| f.to_str()) {
+                self.local.last_selected = Some(name.to_string());
+            }
+        }
+        match self.local.save() {
+            Ok(()) => {
+                self.status = Some(StatusMessage {
+                    text: format!("Vanity Mode = {}", if self.vanity_enabled { "ACTIVE" } else { "DISABLED" }),
+                    kind: StatusKind::Info,
+                });
+                if self.vanity_enabled {
+                    self.trigger_firework();
+                }
+            }
+            Err(e) => {
+                self.status = Some(StatusMessage {
+                    text: format!("Save failed: {e}"),
+                    kind: StatusKind::Error,
+                });
+            }
+        }
+    }
+
     /// Adjust the screensaver timeout by one step.
     pub fn adjust_timeout(&mut self, delta: i32) {
         let next = (self.global.timeout as i32 + delta * TIMEOUT_STEP_SECS as i32)
@@ -409,6 +495,11 @@ impl App {
     /// Re-discover screensavers and refresh the list.
     pub fn refresh_screensavers(&mut self) {
         self.screensavers = crate::preview::discover();
+        #[cfg(feature = "downloader")]
+        {
+            let entries = self.registry_entries.clone();
+            self.merge_registry_entries(entries);
+        }
         self.resolve_highlight();
         self.status = Some(StatusMessage {
             text: "Refreshed screensavers list.".to_string(),
@@ -419,6 +510,11 @@ impl App {
 
     /// Spawn the currently-highlighted screensaver fullscreen.
     pub fn preview_highlighted(&mut self) {
+        #[cfg(feature = "downloader")]
+        if self.trigger_online_download(PendingAction::Preview) {
+            return;
+        }
+
         let Some(s) = self.current_screensaver() else {
             return;
         };
@@ -432,6 +528,11 @@ impl App {
 
     /// Spawn the currently-highlighted screensaver's native configuration dialog.
     pub fn configure_highlighted(&mut self) {
+        #[cfg(feature = "downloader")]
+        if self.trigger_online_download(PendingAction::Configure) {
+            return;
+        }
+
         let Some(s) = self.current_screensaver() else {
             return;
         };
@@ -448,8 +549,67 @@ impl App {
         }
     }
 
+    /// Merge online screensaver entries into local list.
+    #[cfg(feature = "downloader")]
+    pub fn merge_registry_entries(&mut self, entries: Vec<crate::downloader::RegistryEntry>) {
+        self.registry_entries = entries.clone();
+
+        let local_filenames: std::collections::HashSet<String> = self.screensavers.iter()
+            .map(|s| s.path.file_name().and_then(|f| f.to_str()).unwrap_or("").to_lowercase())
+            .collect();
+
+        for entry in entries {
+            let filename = format!("{}.scr", entry.name.to_lowercase().replace(" ", "_"));
+            if local_filenames.contains(&filename) {
+                continue; // Already downloaded/present locally
+            }
+
+            let path = crate::config::LocalConfig::config_path()
+                .and_then(|p| p.parent().map(|parent| {
+                    parent.join("screensavers").join(&filename)
+                }))
+                .unwrap_or_else(|| std::path::PathBuf::from(&filename));
+
+            self.screensavers.push(Screensaver {
+                name: entry.name,
+                path,
+                download_url: Some(entry.download_url),
+            });
+        }
+
+        // Re-sort alphabetically
+        self.screensavers.sort_by_key(|s| s.name.to_lowercase());
+        self.resolve_highlight();
+        self.update_list_items();
+    }
+
+    /// Trigger download of the curated screensaver, performing action once done.
+    #[cfg(feature = "downloader")]
+    pub fn trigger_online_download(&mut self, action: PendingAction) -> bool {
+        if let Some(s) = self.current_screensaver() {
+            if let Some(ref url) = s.download_url {
+                let entry = crate::downloader::RegistryEntry {
+                    name: s.name.clone(),
+                    author: String::new(),
+                    description: String::new(),
+                    download_url: url.clone(),
+                    version: String::new(),
+                };
+                self.pending_action = Some(action);
+                self.download_state = Some(crate::downloader::spawn_download(&entry));
+                return true;
+            }
+        }
+        false
+    }
+
     /// Toggle selection of the highlighted screensaver for custom cycling.
     pub fn toggle_highlighted_selection(&mut self) {
+        #[cfg(feature = "downloader")]
+        if self.trigger_online_download(PendingAction::ToggleSelection) {
+            return;
+        }
+
         let (path_str, name) = {
             let Some(s) = self.current_screensaver() else {
                 return;
@@ -477,6 +637,7 @@ impl App {
 
     /// Adjust the highlight in the saver list, clamping to bounds.
     pub fn move_highlight(&mut self, delta: i32) {
+
         let indices = self.filtered_indices();
         if indices.is_empty() {
             return;
@@ -585,11 +746,7 @@ impl App {
             }
             KeyCode::Char('c') | KeyCode::Char('C') => self.configure_highlighted(),
             KeyCode::Char('v') | KeyCode::Char('V') => {
-                self.vanity_enabled = !self.vanity_enabled;
-                self.status = Some(StatusMessage {
-                    text: format!("Vanity Mode: {}", if self.vanity_enabled { "ON" } else { "OFF" }),
-                    kind: StatusKind::Info,
-                });
+                self.toggle_vanity_mode();
             }
             _ => {}
         }
@@ -622,11 +779,13 @@ impl App {
                 GlobalField::Active => self.toggle_active(),
                 GlobalField::PreventSleep => self.toggle_prevent_sleep(),
                 GlobalField::HideStock => self.toggle_hide_stock(),
+                GlobalField::VanityMode => self.toggle_vanity_mode(),
                 GlobalField::Timeout | GlobalField::CycleTime => {}
             },
             FocusedSection::SaverList => self.apply_highlighted(),
         }
     }
+
 }
 
 pub use ratatui::crossterm::event::{KeyCode, KeyModifiers};
@@ -896,14 +1055,20 @@ mod tests {
             Screensaver {
                 name: "Bubbles".to_string(),
                 path: PathBuf::from("C:\\Windows\\System32\\bubbles.scr"),
+                #[cfg(feature = "downloader")]
+                download_url: None,
             },
             Screensaver {
                 name: "Mystify".to_string(),
                 path: PathBuf::from("C:\\Windows\\System32\\mystify.scr"),
+                #[cfg(feature = "downloader")]
+                download_url: None,
             },
             Screensaver {
                 name: "Ribbons".to_string(),
                 path: PathBuf::from("C:\\Windows\\System32\\ribbons.scr"),
+                #[cfg(feature = "downloader")]
+                download_url: None,
             },
         ];
         let global = GlobalConfig::default();
@@ -967,6 +1132,10 @@ mod tests {
         app.handle_key(KeyCode::Down, KeyModifiers::empty());
         assert_eq!(app.global_field, GlobalField::HideStock);
 
+        // Move down to VanityMode
+        app.handle_key(KeyCode::Down, KeyModifiers::empty());
+        assert_eq!(app.global_field, GlobalField::VanityMode);
+
         // Tab cycles focus to SaverList
         app.handle_key(KeyCode::Tab, KeyModifiers::empty());
         assert_eq!(app.focused, FocusedSection::SaverList);
@@ -1029,5 +1198,43 @@ mod tests {
 
         // Clean up temp dir
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    #[cfg(feature = "downloader")]
+    fn test_registry_merge_and_automated_downloader() {
+        let mut app = mock_app();
+        app.focused = FocusedSection::SaverList;
+
+        // Verify initial list has 3 items (Bubbles, Mystify, Ribbons)
+        assert_eq!(app.screensavers.len(), 3);
+
+        // Manually merge registry entries
+        let entries = vec![
+            crate::downloader::RegistryEntry {
+                name: "OmaXI".to_string(),
+                author: "UberMetroid".to_string(),
+                description: "Matrix style clock".to_string(),
+                download_url: "https://example.com/omaxi.scr".to_string(),
+                version: "1.0".to_string(),
+            },
+        ];
+        app.merge_registry_entries(entries);
+
+        // Verify list now has 4 items (alphabetically ordered: Bubbles, Mystify, OmaXI, Ribbons)
+        assert_eq!(app.screensavers.len(), 4);
+        assert_eq!(app.screensavers[2].name, "OmaXI");
+        assert_eq!(app.screensavers[2].download_url.as_deref(), Some("https://example.com/omaxi.scr"));
+
+        // Highlight OmaXI (which is index 2)
+        app.highlighted = 0;
+        app.move_highlight(1); // moves to Mystify (index 1)
+        app.move_highlight(1); // moves to OmaXI (index 2)
+        assert_eq!(app.highlighted, 2);
+
+        // Pressing space (toggle selection) should trigger background download of OmaXI
+        app.toggle_highlighted_selection();
+        assert!(app.download_state.is_some());
+        assert_eq!(app.pending_action, Some(PendingAction::ToggleSelection));
     }
 }

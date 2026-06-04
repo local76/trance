@@ -25,7 +25,7 @@ use crate::app::{App, FocusedSection, GlobalField};
 const HELP_ROWS: u16 = 12;
 /// Number of rows reserved for the global-prefs block (2 borders + 5 content
 /// lines + 1 padding).
-const PREFS_ROWS: u16 = 8;
+const PREFS_ROWS: u16 = 9;
 /// Number of rows for the title bar (2 lines + 1 bottom border).
 const TITLE_ROWS: u16 = 3;
 
@@ -56,6 +56,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 
     if app.vanity_enabled {
         render_vanity_particles(app, frame);
+    }
+
+    #[cfg(feature = "downloader")]
+    {
+        if app.download_state.is_some() {
+            render_pacman_overlay(app, frame);
+        }
     }
 }
 
@@ -140,6 +147,7 @@ fn render_prefs(app: &mut App, frame: &mut Frame, area: Rect) {
             Constraint::Length(1), // prevent sleep
             Constraint::Length(1), // cycle time
             Constraint::Length(1), // hide stock
+            Constraint::Length(1), // vanity mode
         ])
         .split(inner);
 
@@ -169,6 +177,16 @@ fn render_prefs(app: &mut App, frame: &mut Frame, area: Rect) {
         "NO"
     };
     let hide_stock_color = if app.local.hide_stock {
+        theme.accent_secondary
+    } else {
+        theme.text_dim
+    };
+    let vanity_status = if app.vanity_enabled {
+        "ACTIVE (E.G. FIREWORKS ON APPLY)"
+    } else {
+        "DISABLED"
+    };
+    let vanity_color = if app.vanity_enabled {
         theme.accent_secondary
     } else {
         theme.text_dim
@@ -233,11 +251,19 @@ fn render_prefs(app: &mut App, frame: &mut Frame, area: Rect) {
         hide_stock_status.to_string(),
         hide_stock_color,
     );
+    field_row(
+        rows[5],
+        GlobalField::VanityMode,
+        "Vanity mode:    ",
+        vanity_status.to_string(),
+        vanity_color,
+    );
 }
 
 fn render_list(app: &mut App, frame: &mut Frame, area: Rect) {
     let theme = app.theme;
     let active = app.focused == FocusedSection::SaverList;
+
     let title = if app.filtering {
         Line::from(vec![
             Span::styled(" Screen Saver Preferences ", Style::default().fg(theme.header)),
@@ -275,6 +301,7 @@ fn render_list(app: &mut App, frame: &mut Frame, area: Rect) {
             ),
         ])
     };
+
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
@@ -492,5 +519,92 @@ fn render_vanity_particles(app: &App, frame: &mut Frame) {
                 cell.set_fg(color);
             }
         }
+    }
+}
+
+#[cfg(feature = "downloader")]
+fn render_pacman_overlay(app: &App, frame: &mut Frame) {
+    let theme = app.theme;
+    let area = frame.area();
+    
+    // Draw centered popup box (width = 50, height = 5)
+    let popup_width = 50;
+    let popup_height = 5;
+    let x = (area.width.saturating_sub(popup_width)) / 2;
+    let y = (area.height.saturating_sub(popup_height)) / 2;
+    let popup_area = Rect::new(x, y, popup_width.min(area.width), popup_height.min(area.height));
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme.accent_secondary))
+        .title(Span::styled(" Downloading Online Screensaver ", Style::default().fg(theme.header)));
+    
+    frame.render_widget(Clear, popup_area); // Clear background behind popup
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    // Get progress and name from state
+    let mut progress = 0.0;
+    let mut name = String::new();
+    if let Some(ref state_mutex) = app.download_state {
+        if let Ok(state) = state_mutex.lock() {
+            progress = state.progress;
+            name = state.name.clone();
+        }
+    }
+
+    // Build the pacman animation track
+    // Width of track inside borders (inner.width - 12 for percentage and spacing)
+    let track_width = (inner.width.saturating_sub(12)) as usize;
+    if track_width > 0 {
+        let pacman_pos = ((progress * track_width as f64).round() as usize).min(track_width);
+        
+        let mut track = String::new();
+        // Chomping mouth toggle on alternating ticks (using time millisecond modulo)
+        let is_mouth_open = (std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() / 150) // toggle every 150ms
+            .unwrap_or(0) % 2) == 0;
+            
+        let pacman_char = if progress >= 1.0 {
+            "o" // Success face
+        } else if is_mouth_open {
+            "ᗧ"
+        } else {
+            "o"
+        };
+
+        // Before pacman: empty spaces/eaten track
+        for _ in 0..pacman_pos {
+            track.push(' ');
+        }
+        // Pacman himself
+        if progress < 1.0 {
+            track.push_str(pacman_char);
+            // After pacman: dots remaining to eat, and a ghost at the end
+            for i in (pacman_pos + 1)..track_width {
+                if i == track_width - 1 {
+                    track.push('ᗣ'); // Ghost at the end!
+                } else {
+                    track.push('·'); // Dots
+                }
+            }
+        } else {
+            track.push_str("o ᗣ (Chomped!)");
+        }
+
+        let lines = vec![
+            Line::from(vec![
+                Span::styled(format!(" File: {:<30}", name), Style::default().fg(theme.text_main)),
+            ]),
+            Line::from(vec![
+                Span::styled(" [", Style::default().fg(theme.border)),
+                Span::styled(track, Style::default().fg(theme.accent_primary)),
+                Span::styled("]", Style::default().fg(theme.border)),
+                Span::styled(format!(" {:>3.0}%", progress * 100.0), Style::default().fg(theme.accent_secondary)),
+            ]),
+        ];
+        frame.render_widget(Paragraph::new(lines), inner);
     }
 }

@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 pub struct Screensaver {
     pub name: String,
     pub path: PathBuf,
+    #[cfg(feature = "downloader")]
+    pub download_url: Option<String>,
 }
 
 pub fn discover() -> Vec<Screensaver> {
@@ -43,7 +45,12 @@ pub fn discover() -> Vec<Screensaver> {
             seen.push(filename);
 
             let name = prettify(&path);
-            list.push(Screensaver { name, path });
+            list.push(Screensaver {
+                name,
+                path,
+                #[cfg(feature = "downloader")]
+                download_url: None,
+            });
         }
     }
 

@@ -12,6 +12,9 @@ mod theme;
 mod ui;
 mod win32;
 
+#[cfg(feature = "downloader")]
+pub mod downloader;
+
 use std::io::{Write, stdout};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -229,12 +232,85 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
             last_sleep_prevented = app.local.prevent_sleep;
         }
 
+        #[cfg(feature = "downloader")]
+        {
+            let mut got_entries = None;
+            if let Some(ref registry_mutex) = app.registry_results {
+                if let Ok(mut lock) = registry_mutex.try_lock() {
+                    if let Some(entries) = lock.take() {
+                        got_entries = Some(entries);
+                    }
+                }
+            }
+            if let Some(entries) = got_entries {
+                app.registry_results = None; // Stop polling
+                app.merge_registry_entries(entries);
+            }
+
+            let mut reset_state = false;
+            let mut download_success = false;
+            let mut err_msg = None;
+
+            if let Some(ref state_mutex) = app.download_state {
+                if let Ok(state) = state_mutex.lock() {
+                    match state.status {
+                        crate::downloader::DownloadStatus::Success => {
+                            reset_state = true;
+                            download_success = true;
+                        }
+                        crate::downloader::DownloadStatus::Error(ref err) => {
+                            reset_state = true;
+                            err_msg = Some(err.clone());
+                        }
+                        crate::downloader::DownloadStatus::Downloading => {}
+                    }
+                }
+            }
+
+            if reset_state {
+                app.download_state = None;
+                if download_success {
+                    app.status = Some(crate::app::StatusMessage {
+                        text: "Download completed successfully!".to_string(),
+                        kind: crate::app::StatusKind::Info,
+                    });
+                    app.refresh_screensavers();
+                    if let Some(action) = app.pending_action.take() {
+                        match action {
+                            crate::app::PendingAction::Apply => app.apply_highlighted(),
+                            crate::app::PendingAction::ToggleSelection => app.toggle_highlighted_selection(),
+                            crate::app::PendingAction::Preview => app.preview_highlighted(),
+                            crate::app::PendingAction::Configure => app.configure_highlighted(),
+                        }
+                    }
+                } else if let Some(msg) = err_msg {
+                    app.pending_action = None;
+                    app.status = Some(crate::app::StatusMessage {
+                        text: format!("Download failed: {}", msg),
+                        kind: crate::app::StatusKind::Error,
+                    });
+                }
+            }
+        }
+
         let term_size = terminal.size().unwrap_or_default();
         app.update_particles(term_size.width, term_size.height);
 
         terminal.draw(|f| ui::render(&mut app, f))?;
 
-        let poll = if app.vanity_enabled && !app.particles.is_empty() {
+        let is_animating = (app.vanity_enabled && !app.particles.is_empty())
+            || {
+                #[cfg(feature = "downloader")]
+                {
+                    app.download_state.is_some()
+                }
+                #[cfg(not(feature = "downloader"))]
+                {
+                    false
+                }
+            };
+
+        let poll = if is_animating {
             Duration::from_millis(30)
         } else {
             Duration::from_millis(250)

@@ -84,6 +84,7 @@ pub struct LocalConfig {
     pub random_cycle_secs: u32,
     pub selected_paths: Vec<String>,
     pub hide_stock: bool,
+    pub vanity_mode: bool,
 }
 
 impl Default for LocalConfig {
@@ -94,6 +95,7 @@ impl Default for LocalConfig {
             random_cycle_secs: 30,
             selected_paths: Vec::new(),
             hide_stock: false,
+            vanity_mode: false,
         }
     }
 }
@@ -129,6 +131,8 @@ impl LocalConfig {
                     .collect();
             } else if let Some(v) = line.strip_prefix("hide_stock: ") {
                 out.hide_stock = v.trim() == "true";
+            } else if let Some(v) = line.strip_prefix("vanity_mode: ") {
+                out.vanity_mode = v.trim() == "true";
             }
         }
         out
@@ -142,12 +146,13 @@ impl LocalConfig {
             std::fs::create_dir_all(parent)?;
         }
         let content = format!(
-            "last_selected: {}\nprevent_sleep: {}\nrandom_cycle_secs: {}\nselected_paths: {}\nhide_stock: {}\n",
+            "last_selected: {}\nprevent_sleep: {}\nrandom_cycle_secs: {}\nselected_paths: {}\nhide_stock: {}\nvanity_mode: {}\n",
             self.last_selected.as_deref().unwrap_or(""),
             self.prevent_sleep,
             self.random_cycle_secs,
             self.selected_paths.join(";"),
             self.hide_stock,
+            self.vanity_mode,
         );
         std::fs::write(path, content)
     }
@@ -187,6 +192,7 @@ mod tests {
                 "C:\\Windows\\System32\\bubbles.scr".to_string(),
             ],
             hide_stock: true,
+            vanity_mode: true,
         };
 
         // Save
@@ -205,6 +211,7 @@ mod tests {
             ]
         );
         assert!(loaded.hide_stock);
+        assert!(loaded.vanity_mode);
 
         // Clean up temp dir
         let _ = std::fs::remove_dir_all(&temp_dir);
