@@ -19,7 +19,7 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragra
 
 use crate::app::{App, FocusedSection, GlobalField};
 
-const STATUS_TTL_EVENTS: u32 = 30; // about 7.5s at 250ms poll
+
 
 /// Number of rows reserved for the help block (2 borders + 9 content lines).
 const HELP_ROWS: u16 = 11;
@@ -392,10 +392,6 @@ pub fn truncate(s: &str, max: usize) -> String {
     }
 }
 
-/// Clear the status message after `STATUS_TTL_EVENTS` have elapsed.
-pub fn status_ttl_events() -> u32 {
-    STATUS_TTL_EVENTS
-}
 
 fn render_vanity_particles(app: &App, frame: &mut Frame) {
     let theme = app.theme;
@@ -410,12 +406,34 @@ fn render_vanity_particles(app: &App, frame: &mut Frame) {
     let width = buffer.area.width;
     let height = buffer.area.height;
 
+    // Render background stars
+    for star in &app.stars {
+        let x = star.x.round() as i16;
+        let y = star.y.round() as i16;
+        if x >= 0 && x < width as i16 && y >= 0 && y < height as i16 {
+            let cell = &mut buffer[(x as u16, y as u16)];
+            if cell.symbol() == " " {
+                if star.brightness > 0.6 {
+                    cell.set_symbol("✦");
+                    cell.set_fg(theme.accent_secondary);
+                } else if star.brightness > 0.15 {
+                    cell.set_symbol("✧");
+                    cell.set_fg(theme.text_main);
+                } else {
+                    cell.set_symbol(".");
+                    cell.set_fg(theme.text_dim);
+                }
+            }
+        }
+    }
+
+    // Overlay active particles
     for p in &app.particles {
         let x = p.x.round() as i16;
         let y = p.y.round() as i16;
         if x >= 0 && x < width as i16 && y >= 0 && y < height as i16 {
             let cell = &mut buffer[(x as u16, y as u16)];
-            if cell.symbol() == " " {
+            if cell.symbol() == " " || cell.symbol() == "." || cell.symbol() == "✧" || cell.symbol() == "✦" {
                 cell.set_symbol(p.symbol);
                 let color = colors[p.color_idx % colors.len()];
                 cell.set_fg(color);

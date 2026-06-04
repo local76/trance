@@ -80,6 +80,7 @@ pub struct App {
     pub list_items: Vec<ratatui::widgets::ListItem<'static>>,
     pub vanity_enabled: bool,
     pub particles: Vec<Particle>,
+    pub stars: Vec<Star>,
     pub term_width: u16,
     pub term_height: u16,
 }
@@ -118,6 +119,7 @@ impl App {
             list_items: Vec::new(),
             vanity_enabled: false,
             particles: Vec::new(),
+            stars: Vec::new(),
             term_width: 80,
             term_height: 25,
         };
@@ -633,22 +635,13 @@ pub fn random_cycle_entry() -> Option<Screensaver> {
 /// Convenience: kick off the random cycle and return when it finishes.
 pub fn run_random_cycle() {
     let local_config = LocalConfig::load();
-    let discovered = crate::preview::discover();
     let exe = std::env::current_exe().ok();
 
-    let candidates: Vec<PathBuf> = if !local_config.selected_paths.is_empty() {
-        local_config.selected_paths
-            .iter()
-            .map(PathBuf::from)
-            .filter(|p| p.exists() && !is_self(p, exe.as_ref()) && !is_uninstall(p))
-            .collect()
-    } else {
-        discovered
-            .into_iter()
-            .map(|s| s.path)
-            .filter(|p| !is_self(p, exe.as_ref()) && !is_uninstall(p))
-            .collect()
-    };
+    let candidates: Vec<PathBuf> = local_config.selected_paths
+        .iter()
+        .map(PathBuf::from)
+        .filter(|p| p.exists() && !is_self(p, exe.as_ref()) && !is_uninstall(p))
+        .collect();
 
     if candidates.is_empty() {
         return;
@@ -706,6 +699,13 @@ fn is_uninstall(p: &std::path::Path) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Star {
+    pub x: f64,
+    pub y: f64,
+    pub brightness: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParticlePhase {
     Ascent,
     Explosion,
@@ -725,6 +725,26 @@ pub struct Particle {
 }
 
 impl App {
+    /// Generate random background stars matching the terminal bounds
+    pub fn generate_stars(&mut self) {
+        let width = self.term_width;
+        let height = self.term_height;
+        let mut stars = Vec::new();
+        let mut seed = 12345u64;
+        if let Ok(d) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            seed = d.as_micros() as u64;
+        }
+        let star_count = ((width as u32 * height as u32) / 80).clamp(15, 60);
+        for _ in 0..star_count {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let x = (seed % width.max(1) as u64) as f64;
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let y = (seed % height.max(1) as u64) as f64;
+            stars.push(Star { x, y, brightness: 0.0 });
+        }
+        self.stars = stars;
+    }
+
     /// Trigger a firework launch from the bottom center of the terminal.
     pub fn trigger_firework(&mut self) {
         if !self.vanity_enabled {
@@ -732,7 +752,7 @@ impl App {
         }
         let width = self.term_width;
         let height = self.term_height;
-        let seed = std::time::SystemTime::now()
+        let mut seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_micros() as u64)
             .unwrap_or(0);
@@ -740,16 +760,27 @@ impl App {
         let start_x = (width / 2) as f64 + ((seed % 30) as f64 - 15.0);
         let start_y = height.saturating_sub(1) as f64;
 
-        // Calculate height target in the top 15% to 30% of the terminal.
-        let target_y = (height as f64 * 0.15).max(2.0) + (seed % 4) as f64;
+        // Random target height: between top 10% and 50% of terminal height.
+        let min_target = (height as f64 * 0.1).max(2.0);
+        let max_target = (height as f64 * 0.5).max(4.0);
+        let range = if max_target > min_target { max_target - min_target } else { 1.0 };
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let target_y = min_target + ((seed % 100) as f64 / 100.0) * range;
+
         let dist = (start_y - target_y).max(1.0);
-        let vy: f64 = -1.2; // Launch upwards
+        
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let vy: f64 = -0.5 - ((seed % 100) as f64 / 100.0) * 0.4; // Launch upwards at 30 FPS speed
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let vx: f64 = ((seed % 100) as f64 - 50.0) / 100.0 * 0.25; // Random launch direction (slight angle)
+        
         let max_age = (dist / vy.abs()).round() as u32;
 
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         self.particles.push(Particle {
             x: start_x,
             y: start_y,
-            vx: 0.0,
+            vx,
             vy,
             symbol: "▲",
             age: 0,
@@ -761,12 +792,22 @@ impl App {
 
     /// Update TUI fireworks particle simulation physics
     pub fn update_particles(&mut self, width: u16, height: u16) {
-        self.term_width = width;
-        self.term_height = height;
-
         if !self.vanity_enabled {
             self.particles.clear();
+            self.stars.clear();
             return;
+        }
+
+        // Initialize or regenerate stars if window size changed
+        if width != self.term_width || height != self.term_height || self.stars.is_empty() {
+            self.term_width = width;
+            self.term_height = height;
+            self.generate_stars();
+        }
+
+        // Decay background stars
+        for star in &mut self.stars {
+            star.brightness = (star.brightness - 0.04).max(0.0);
         }
 
         let mut next_particles = Vec::new();
@@ -786,11 +827,13 @@ impl App {
                         if p.age >= p.max_age {
                             // Explode into a burst of sparkles!
                             let symbols = ["✦", "✧", "*", "+", ".", "°", "o"];
-                            let count = 12 + (seed % 8) as usize;
+                            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                            let count = 14 + (seed % 10) as usize;
                             for i in 0..count {
                                 seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
                                 let angle = (i as f64 / count as f64) * 2.0 * std::f64::consts::PI;
-                                let speed = 0.5 + ((seed % 100) as f64 / 100.0) * 0.7;
+                                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                                let speed = 0.15 + ((seed % 100) as f64 / 100.0) * 0.25;
                                 let vx = angle.cos() * speed;
                                 // Scale y-velocity slightly to accommodate rectangular terminal cell aspect ratio
                                 let vy = angle.sin() * speed * 0.45;
@@ -798,7 +841,7 @@ impl App {
                                 seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
                                 let symbol_idx = (seed as usize) % symbols.len();
                                 seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-                                let max_age = 6 + (seed % 6) as u32;
+                                let max_age = 12 + (seed % 8) as u32;
 
                                 next_particles.push(Particle {
                                     x: p.x,
@@ -817,7 +860,18 @@ impl App {
                         }
                     }
                     ParticlePhase::Explosion => {
-                        p.vy += 0.04; // Gravity!
+                        p.vy += 0.008; // Gravity for 30 FPS
+                        
+                        // Light up nearby stars
+                        for star in &mut self.stars {
+                            let dx = p.x - star.x;
+                            let dy = p.y - star.y;
+                            let dist = (dx * dx + dy * dy).sqrt();
+                            if dist < 5.0 {
+                                star.brightness = (star.brightness + (5.0 - dist) * 0.15).min(1.0);
+                            }
+                        }
+
                         if p.age < p.max_age {
                             next_particles.push(p);
                         }

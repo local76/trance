@@ -221,7 +221,6 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
     let _borderless = BorderlessConsole::enable();
     let _ = ratatui::crossterm::execute!(stdout(), ratatui::crossterm::event::DisableMouseCapture);
 
-    let poll = Duration::from_millis(250);
     let mut status_ttl: u32 = 0;
     let mut last_sleep_prevented = false;
 
@@ -239,7 +238,18 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
 
         terminal.draw(|f| ui::render(&mut app, f))?;
 
-        if event::poll(poll)? {
+        let poll = if app.vanity_enabled && !app.particles.is_empty() {
+            Duration::from_millis(30)
+        } else {
+            Duration::from_millis(250)
+        };
+
+        let start_time = std::time::Instant::now();
+        let has_event = event::poll(poll)?;
+        let elapsed_ms = start_time.elapsed().as_millis() as u32;
+        let tick_ms = if has_event { elapsed_ms.max(1) } else { poll.as_millis() as u32 };
+
+        if has_event {
             match event::read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     let code: KeyCode = key.code;
@@ -247,7 +257,7 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
                     if app.handle_key(code, mods) {
                         break;
                     }
-                    status_ttl = ui::status_ttl_events();
+                    status_ttl = 7500; // 7.5 seconds in ms
                 }
                 Event::Resize(_, _) => {
                     // ratatui handles resize automatically on the next draw.
@@ -257,7 +267,7 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
         }
 
         if status_ttl > 0 {
-            status_ttl -= 1;
+            status_ttl = status_ttl.saturating_sub(tick_ms);
             if status_ttl == 0 {
                 if let Some(ref msg) = app.status {
                     if msg.kind == crate::app::StatusKind::Info {
