@@ -1,41 +1,101 @@
-use std::path::PathBuf;
+//! Discover installed `.scr` files on the system.
 
-pub fn discover_screensavers() -> Vec<(String, PathBuf)> {
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone)]
+pub struct Screensaver {
+    pub name: String,
+    pub path: PathBuf,
+}
+
+pub fn discover() -> Vec<Screensaver> {
     let mut list = Vec::new();
-    let appdata = match std::env::var("APPDATA") {
-        Ok(val) => PathBuf::from(val).join(".omaxi").join("apps").join("ssm"),
-        Err(_) => return list,
-    };
-    
-    // Scan for any screensaver file in AppData
-    if let Ok(entries) = std::fs::read_dir(appdata) {
+    let mut seen: Vec<PathBuf> = Vec::new();
+
+    for dir in search_dirs() {
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
         for entry in entries.flatten() {
             let path = entry.path();
-            if let Some(ext) = path.extension() {
-                if ext.to_ascii_lowercase() == "scr" {
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        // Prettify name: strip "omaxi-" and ".scr"
-                        let pretty_name = if name.to_lowercase().starts_with("omaxi-") {
-                            name.strip_prefix("omaxi-")
-                                .and_then(|s| s.strip_suffix(".scr"))
-                                .map(|s| {
-                                    let mut chars = s.chars();
-                                    match chars.next() {
-                                        None => String::new(),
-                                        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
-                                    }
-                                })
-                                .unwrap_or_else(|| name.to_string())
-                        } else {
-                            name.strip_suffix(".scr").unwrap_or(name).to_string()
-                        };
-                        
-                        list.push((pretty_name, path));
-                    }
-                }
+            if !path.is_file() {
+                continue;
             }
+            if path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(str::to_ascii_lowercase)
+                .as_deref()
+                != Some("scr")
+            {
+                continue;
+            }
+            // Dedup by lowercase full path; we don't need canonicalize()'s
+            // UNC prefixes for matching.
+            let key = path.to_string_lossy().to_lowercase();
+            if seen
+                .iter()
+                .any(|p| p.to_string_lossy().to_lowercase() == key)
+            {
+                continue;
+            }
+            seen.push(path.clone());
+
+            let name = prettify(&path);
+            list.push(Screensaver { name, path });
         }
     }
-    list.sort_by(|a, b| a.0.cmp(&b.0));
+
+    list.sort_by_key(|a| a.name.to_lowercase());
     list
+}
+
+fn search_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        dirs.push(PathBuf::from(appdata).join("SSM").join("screensavers"));
+    }
+
+    if let Ok(system_root) = std::env::var("SystemRoot") {
+        let root = PathBuf::from(system_root);
+        dirs.push(root.join("System32"));
+        dirs.push(root.join("SysWOW64"));
+    }
+
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        dirs.push(PathBuf::from(pf).join("Windows NT").join("Accessories"));
+    }
+    if let Ok(pfx86) = std::env::var("ProgramFiles(x86)") {
+        dirs.push(PathBuf::from(pfx86).join("Windows NT").join("Accessories"));
+    }
+
+    dirs
+}
+
+fn prettify(path: &Path) -> String {
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    let mut chars = stem.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_prettify() {
+        assert_eq!(
+            prettify(Path::new("C:/Windows/System32/mystify.scr")),
+            "Mystify"
+        );
+        assert_eq!(prettify(Path::new("bubbles.scr")), "Bubbles");
+        assert_eq!(prettify(Path::new("")), "");
+        assert_eq!(prettify(Path::new(".scr")), ".scr");
+    }
 }

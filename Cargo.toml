@@ -1,12 +1,34 @@
 [package]
 name = "ssm"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
+rust-version = "1.85"
 
 [dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
 winreg = "0.52"
-winapi = { version = "0.3", features = ["winuser", "wingdi", "winreg", "libloaderapi", "minwindef", "processthreadsapi"] }
-crossterm = "0.27"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_System_Power",
+    "Win32_System_Shutdown",
+    "Win32_UI_Accessibility",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_HiDpi",
+    "Win32_System_Threading",
+]}
 
 [build-dependencies]
 embed-resource = "2.5"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
