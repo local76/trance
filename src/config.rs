@@ -1,8 +1,8 @@
 //! Two pieces of persisted state:
 //!  - `GlobalConfig` lives in the Windows registry under
 //!    `HKCU\Control Panel\Desktop` (the keys Windows itself uses).
-//!  - `LocalConfig` lives at `%APPDATA%\ssm\config.yaml` and tracks
-//!    ssm-specific preferences (last selection, prevent-sleep).
+//!  - `LocalConfig` lives at `%APPDATA%\wsm\config.yaml` and tracks
+//!    wsm-specific preferences (last selection, prevent-sleep).
 
 use std::path::PathBuf;
 
@@ -10,7 +10,7 @@ use winreg::RegKey;
 use winreg::enums::*;
 
 const REG_DESKTOP: &str = if cfg!(test) {
-    "Software\\ssm\\TestDesktop"
+    "Software\\wsm\\TestDesktop"
 } else {
     "Control Panel\\Desktop"
 };
@@ -103,7 +103,7 @@ impl Default for LocalConfig {
 impl LocalConfig {
     pub fn config_path() -> Option<PathBuf> {
         let appdata = std::env::var("APPDATA").ok()?;
-        Some(PathBuf::from(appdata).join("ssm").join("config.yaml"))
+        Some(PathBuf::from(appdata).join("wsm").join("config.yaml"))
     }
 
     pub fn load() -> Self {
@@ -170,7 +170,7 @@ mod tests {
         let _lock = TEST_LOCK.lock().unwrap();
         // Create a unique temp dir for the test to avoid collisions
         let temp_dir = std::env::temp_dir().join(format!(
-            "ssm_test_{}",
+            "wsm_test_{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn test_global_config_roundtrip() {
         let _lock = TEST_LOCK.lock().unwrap();
-        // REG_DESKTOP is redirected to "Software\ssm\TestDesktop" in test mode
+        // REG_DESKTOP is redirected to "Software\wsm\TestDesktop" in test mode
         let config = GlobalConfig {
             active_scr: "C:\\Windows\\System32\\bubbles.scr".to_string(),
             active: true,
@@ -237,6 +237,6 @@ mod tests {
         assert_eq!(loaded.timeout, 300);
 
         // Clean up test key in registry
-        let _ = RegKey::predef(HKEY_CURRENT_USER).delete_subkey("Software\\ssm\\TestDesktop");
+        let _ = RegKey::predef(HKEY_CURRENT_USER).delete_subkey("Software\\wsm\\TestDesktop");
     }
 }

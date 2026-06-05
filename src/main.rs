@@ -1,4 +1,4 @@
-//! SSM — Screen Saver Management.
+//! WSM — Windows Screensaver Manager.
 //!
 //! Standalone TUI for configuring any Windows screensaver.
 
@@ -40,7 +40,7 @@ use crate::win32::BorderlessConsole;
 /// Screen saver management for Windows.
 #[derive(Parser, Debug)]
 #[command(
-    name = "ssm",
+    name = "wsm",
     version,
     about,
     long_about = None,
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = init_tracing();
     install_panic_hook();
     let cli = Cli::parse_from(pre_munge_args(std::env::args().collect()));
-    info!(?cli, "ssm start");
+    info!(?cli, "wsm start");
 
     let command = cli.command.unwrap_or(Command::Tui);
     let result: Result<(), Box<dyn std::error::Error>> = match command {
@@ -101,13 +101,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if let Err(ref e) = result {
-        error!(error = %e, "ssm failed");
+        error!(error = %e, "wsm failed");
     }
     result
 }
 
 /// Translate Windows `.scr` calling-convention flags (`/s`, `/c`, `/p`) into
-/// clap subcommand names so `ssm.exe /s` works the same as `ssm.exe run`.
+/// clap subcommand names so `wsm.exe /s` works the same as `wsm.exe run`.
 fn pre_munge_args(args: Vec<String>) -> Vec<String> {
     let mut args = args;
     if args.len() < 2 {
@@ -137,8 +137,8 @@ fn pre_munge_args(args: Vec<String>) -> Vec<String> {
 /// the TUI.
 fn init_tracing() -> WorkerGuard {
     let log_path = LocalConfig::config_path()
-        .and_then(|p| p.parent().map(|p| p.join("ssm.log")))
-        .unwrap_or_else(|| PathBuf::from("ssm.log"));
+        .and_then(|p| p.parent().map(|p| p.join("wsm.log")))
+        .unwrap_or_else(|| PathBuf::from("wsm.log"));
     if let Some(parent) = log_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -204,7 +204,7 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
         }
     };
 
-    let _title_guard = ConsoleTitleGuard::new("SSM — Screen Saver Management");
+    let _title_guard = ConsoleTitleGuard::new("WSM — Windows Screensavers Manager");
 
     let screensavers = preview::discover();
 
@@ -455,7 +455,7 @@ fn toggle_active() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
-    println!("SSM Doctor — Diagnostic Report");
+    println!("WSM Doctor — Diagnostic Report");
     println!("=============================");
 
     // 1. Check Registry Access
@@ -483,12 +483,12 @@ fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
     // 3. Discovery Directories
     println!("\nDiscovery Directories:");
     if let Ok(appdata) = std::env::var("APPDATA") {
-        let ssm_dir = std::path::PathBuf::from(appdata)
-            .join("ssm")
+        let wsm_dir = std::path::PathBuf::from(appdata)
+            .join("wsm")
             .join("screensavers");
-        let exists = ssm_dir.exists();
+        let exists = wsm_dir.exists();
         println!(
-            "  - %APPDATA%/ssm/screensavers: {}",
+            "  - %APPDATA%/wsm/screensavers: {}",
             if exists { "EXISTS" } else { "NOT FOUND" }
         );
     }
@@ -525,8 +525,8 @@ fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
     // 4. Log File Check
     print!("\nLog File Writable:       ");
     let log_path = LocalConfig::config_path()
-        .and_then(|p| p.parent().map(|p| p.join("ssm.log")))
-        .unwrap_or_else(|| std::path::PathBuf::from("ssm.log"));
+        .and_then(|p| p.parent().map(|p| p.join("wsm.log")))
+        .unwrap_or_else(|| std::path::PathBuf::from("wsm.log"));
     if let Some(parent) = log_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }

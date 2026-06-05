@@ -1,7 +1,7 @@
 //! Ratatui-based rendering.  Pure function of `App` -> `Frame`.
 //!
 //! # Model-Render Split
-//! SSM uses a strict Model-Render architectural split:
+//! WSM uses a strict Model-Render architectural split:
 //!
 //! * **Model (`app.rs`)**: Owns the state (selected saver, timer configuration, focus, etc.)
 //!   and implements the business logic, key handlers, and state modifications.
@@ -95,12 +95,12 @@ fn render_title(app: &App, frame: &mut Frame, area: Rect) {
         .border_style(Style::default().fg(theme.border));
     let mut lines = vec![Line::from(vec![
         Span::styled(
-            "SCREEN SAVER MANAGEMENT",
+            "WINDOWS SCREENSAVERS MANAGER",
             Style::default()
                 .fg(theme.accent_secondary)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled("  (SSM)", Style::default().fg(theme.text_dim)),
+        Span::styled("  (WSM)", Style::default().fg(theme.text_dim)),
     ])];
     if let Some(ref status) = app.status {
         let color = match status.kind {
@@ -320,7 +320,7 @@ fn render_list(app: &mut App, frame: &mut Frame, area: Rect) {
             vec![
                 Line::from("No .scr files found."),
                 Line::from(Span::styled(
-                    "Drop one into %APPDATA%\\ssm\\screensavers",
+                    "Drop one into %APPDATA%\\wsm\\screensavers",
                     Style::default().fg(theme.text_dim),
                 )),
             ]

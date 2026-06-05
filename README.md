@@ -1,10 +1,10 @@
-# Screen Saver Manager (SSM)
+# Windows Screensavers Manager (WSM)
 
 A lightweight, modern Windows Screen Saver Management TUI dashboard built in Rust. It enables discovering, previewing, and configuring screensavers on mixed-DPI multi-monitor environments.
 
 ```
 +================================================================+
-| SCREEN SAVER MANAGEMENT  (SSM)                                 |
+| WINDOWS SCREENSAVERS MANAGER  (WSM)                            |
 +----------------------------------------------------------------+
 |  Global System Preferences                                     |
 |  ▶ Active:         ACTIVE                                      |
@@ -29,10 +29,10 @@ A lightweight, modern Windows Screen Saver Management TUI dashboard built in Rus
 
 ## Subcommands & CLI
 
-SSM acts as both a dashboard and a screensaver command-line handler.
+WSM acts as both a dashboard and a screensaver command-line handler.
 
 ```bash
-ssm.exe [OPTIONS] [COMMAND]
+wsm.exe [OPTIONS] [COMMAND]
 
 Options:
   --theme <THEME>  Force TUI theme: dark, light, high-contrast, no-color
@@ -64,23 +64,23 @@ Navigate and configure your preferences dynamically using the keyboard:
 | **`F5`** / **`R`** | Re-scan the system and `%APPDATA%` directories for new screensavers |
 | **`P`** | Launch a full-screen preview of the highlighted screensaver |
 | **`V`** | Toggle Vanity Mode (off by default; displays interactive fireworks upon selection/apply) |
-| **`q / Esc`** | Quit SSM |
+| **`q / Esc`** | Quit WSM |
 
 ---
 
 ## File & Configuration Paths
 
 * **System Preferences**: Read and written to standard registry values under `HKCU\Control Panel\Desktop` (`SCRNSAVE.EXE`, `ScreenSaveActive`, `ScreenSaveTimeOut`).
-* **SSM Custom Preferences**: Stored at `%APPDATA%\ssm\config.yaml` (contains last-selected screensaver and prevent-sleep status).
-* **Screensaver Drop Path**: Put custom `.scr` screensavers in `%APPDATA%\ssm\screensavers` to have SSM discover them.
-* **Logs File**: Diagnostics are written to `%APPDATA%\ssm\ssm.log` so they do not clutter raw terminal outputs.
+* **WSM Custom Preferences**: Stored at `%APPDATA%\wsm\config.yaml` (contains last-selected screensaver and prevent-sleep status).
+* **Screensaver Drop Path**: Put custom `.scr` screensavers in `%APPDATA%\wsm\screensavers` to have WSM discover them.
+* **Logs File**: Diagnostics are written to `%APPDATA%\wsm\wsm.log` so they do not clutter raw terminal outputs.
 
 ---
 
 ## Environment Variables
 
 * **`NO_COLOR`**: Set `NO_COLOR=1` to disable styling colors and fall back to monochromatic black & white.
-* **`RUST_LOG`**: Set `RUST_LOG=debug` or `RUST_LOG=trace` to adjust logging verbosity in `ssm.log`.
+* **`RUST_LOG`**: Set `RUST_LOG=debug` or `RUST_LOG=trace` to adjust logging verbosity in `wsm.log`.
 
 ---
 
@@ -91,7 +91,7 @@ Ensure you have Rust and Cargo installed.
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd ssm
+cd windows-screensavers-manager
 
 # Build debug binary
 cargo build
@@ -100,4 +100,4 @@ cargo build
 cargo build --release
 ```
 
-The optimized binary will be compiled to `target/release/ssm.exe`. You can rename this to `ssm.scr` to install it directly as a Windows screensaver!
+The optimized binary will be compiled to `target/release/wsm.exe`. You can rename this to `wsm.scr` to install it directly as a Windows screensaver!

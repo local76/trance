@@ -987,24 +987,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
-name = "ssm"
-version = "0.7.0"
-dependencies = [
- "clap",
- "crossterm",
- "embed-resource",
- "ratatui",
- "serde",
- "serde_json",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "ureq",
- "windows-sys 0.59.0",
- "winreg",
-]
-
-[[package]]
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1603,6 +1585,24 @@ name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
+
+[[package]]
+name = "wsm"
+version = "0.7.0"
+dependencies = [
+ "clap",
+ "crossterm",
+ "embed-resource",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "ureq",
+ "windows-sys 0.59.0",
+ "winreg",
+]
 
 [[package]]
 name = "yoke"

@@ -1,4 +1,4 @@
-//! Safe wrappers around the Win32 APIs that SSM touches.
+//! Safe wrappers around the Win32 APIs that WSM touches.
 //!
 //! Everything that calls into `windows-sys` lives here so the rest of the
 //! codebase never needs `unsafe`.
@@ -371,7 +371,7 @@ pub fn set_console_title(title: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-/// A guard that holds a named system mutex to ensure only one instance of SSM TUI is running.
+/// A guard that holds a named system mutex to ensure only one instance of WSM TUI is running.
 pub struct SingleInstanceGuard {
     handle: windows_sys::Win32::Foundation::HANDLE,
 }
@@ -390,7 +390,7 @@ impl SingleInstanceGuard {
             ) -> windows_sys::Win32::Foundation::HANDLE;
         }
 
-        let name: Vec<u16> = "Local\\SSM_SingleInstanceMutex_2026"
+        let name: Vec<u16> = "Local\\WSM_SingleInstanceMutex_2026"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();
@@ -405,7 +405,7 @@ impl SingleInstanceGuard {
         if err == ERROR_ALREADY_EXISTS {
             // SAFETY: CloseHandle is safe to call on non-null handle.
             unsafe { windows_sys::Win32::Foundation::CloseHandle(handle) };
-            return Err("Another instance of SSM is already running.".to_string());
+            return Err("Another instance of WSM is already running.".to_string());
         }
 
         Ok(SingleInstanceGuard { handle })
