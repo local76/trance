@@ -258,20 +258,75 @@ impl App {
                     s_filename.is_some() && s_filename == active_filename
                 });
                 let exists = s.path.exists();
-                #[cfg(feature = "downloader")]
-                let is_online = s.download_url.is_some();
-                #[cfg(not(feature = "downloader"))]
-                let is_online = false;
 
-                let prefix = if is_checked {
-                    "[x] ".to_string()
+                let prefix = if is_checked { "[x]" } else { "[ ]" };
+                let status_str = if is_applied {
+                    format!("{} Applied", prefix)
+                } else if is_checked {
+                    format!("{} Active", prefix)
                 } else {
-                    "[ ] ".to_string()
+                    format!("{} Inactive", prefix)
+                };
+                let status_color = if is_applied {
+                    theme.applied
+                } else if is_checked {
+                    theme.accent_primary
+                } else {
+                    theme.text_dim
                 };
 
-                let mut spans = vec![
+                let location_str = if !exists {
+                    "            ".to_string() // 12 spaces
+                } else {
+                    let path_lower = s.path.to_string_lossy().to_lowercase();
+                    if path_lower.contains("system32") {
+                        "\\system32   ".to_string()
+                    } else if path_lower.contains("windows") {
+                        "\\windows    ".to_string()
+                    } else if path_lower.contains("appdata") || path_lower.contains("roaming") {
+                        "\\appdata    ".to_string()
+                    } else {
+                        "\\local      ".to_string()
+                    }
+                };
+                let location_color = if !exists {
+                    theme.text_dim
+                } else {
+                    theme.text_main
+                };
+
+                let friendly_name = crate::ui::truncate(&s.name, 24);
+                let friendly_str = format!("{:<24}  ", friendly_name);
+
+                let filename = s.path.file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or("");
+                let filename_truncated = crate::ui::truncate(filename, 18);
+                let filename_str = format!("{:<18}  ", filename_truncated);
+
+                let is_stock = crate::preview::is_stock_screensaver(&s.path);
+                let stock_str = if is_stock {
+                    "Stock"
+                } else {
+                    "Custom"
+                };
+                let stock_color = if is_stock {
+                    theme.text_dim
+                } else {
+                    theme.accent_secondary
+                };
+
+                let spans = vec![
                     ratatui::text::Span::styled(
-                        prefix,
+                        format!("{:<12}  ", status_str),
+                        ratatui::style::Style::default().fg(status_color),
+                    ),
+                    ratatui::text::Span::styled(
+                        location_str,
+                        ratatui::style::Style::default().fg(location_color),
+                    ),
+                    ratatui::text::Span::styled(
+                        friendly_str,
                         ratatui::style::Style::default().fg(if is_applied {
                             theme.text_main
                         } else {
@@ -279,37 +334,18 @@ impl App {
                         }),
                     ),
                     ratatui::text::Span::styled(
-                        format!("{:<22}", crate::ui::truncate(&s.name, 22)),
+                        filename_str,
                         ratatui::style::Style::default().fg(if is_applied {
                             theme.text_main
                         } else {
                             theme.text_dim
                         }),
-                    )
+                    ),
+                    ratatui::text::Span::styled(
+                        stock_str.to_string(),
+                        ratatui::style::Style::default().fg(stock_color),
+                    ),
                 ];
-                if is_applied {
-                    spans.push(ratatui::text::Span::styled(
-                        " [Applied]",
-                        ratatui::style::Style::default().fg(theme.applied),
-                    ));
-                } else if is_online {
-                    if exists {
-                        spans.push(ratatui::text::Span::styled(
-                            " [local]",
-                            ratatui::style::Style::default().fg(theme.accent_primary),
-                        ));
-                    } else {
-                        spans.push(ratatui::text::Span::styled(
-                            " [Online]",
-                            ratatui::style::Style::default().fg(theme.accent_secondary),
-                        ));
-                    }
-                } else if !exists {
-                    spans.push(ratatui::text::Span::styled(
-                        " [Missing]",
-                        ratatui::style::Style::default().fg(theme.missing),
-                    ));
-                }
                 ratatui::widgets::ListItem::new(ratatui::text::Line::from(spans))
             })
             .collect();

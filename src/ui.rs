@@ -21,8 +21,8 @@ use crate::app::{App, FocusedSection, GlobalField};
 
 
 
-/// Number of rows reserved for the help block (2 borders + 12 content lines).
-const HELP_ROWS: u16 = 14;
+/// Number of rows reserved for the help block (2 borders + 6 content lines).
+const HELP_ROWS: u16 = 8;
 /// Number of rows reserved for the global-prefs block (2 borders + 5 content
 /// lines + 1 padding).
 const PREFS_ROWS: u16 = 9;
@@ -456,8 +456,25 @@ fn render_list(app: &mut App, frame: &mut Frame, area: Rect) {
         return;
     }
 
+    let list_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Table Header
+            Constraint::Min(1),    // List items
+        ])
+        .split(inner);
+
+    let header_line = Line::from(vec![
+        Span::styled("  STATUS        ", Style::default().fg(theme.accent_primary).add_modifier(Modifier::BOLD)),
+        Span::styled("LOCATION     ", Style::default().fg(theme.accent_primary).add_modifier(Modifier::BOLD)),
+        Span::styled("FRIENDLY NAME             ", Style::default().fg(theme.accent_primary).add_modifier(Modifier::BOLD)),
+        Span::styled("FILE NAME           ", Style::default().fg(theme.accent_primary).add_modifier(Modifier::BOLD)),
+        Span::styled("TYPE", Style::default().fg(theme.accent_primary).add_modifier(Modifier::BOLD)),
+    ]);
+    frame.render_widget(Paragraph::new(header_line), list_layout[0]);
+
     let total_items = indices.len();
-    let visible_height = inner.height as usize;
+    let visible_height = list_layout[1].height as usize;
     let selected_pos = indices
         .iter()
         .position(|&i| i == app.highlighted)
@@ -491,7 +508,7 @@ fn render_list(app: &mut App, frame: &mut Frame, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(if active { "▶ " } else { "▷ " });
-    frame.render_stateful_widget(list, inner, &mut state);
+    frame.render_stateful_widget(list, list_layout[1], &mut state);
 }
 
 fn render_help(theme: crate::theme::TuiTheme, frame: &mut Frame, area: Rect) {
@@ -502,53 +519,35 @@ fn render_help(theme: crate::theme::TuiTheme, frame: &mut Frame, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let help_lines = vec![
-        Line::from(Span::styled("KEYBOARD SHORTCUTS:", Style::default().fg(theme.header))),
-        Line::from(vec![
-            Span::styled("[Tab]     ", Style::default().fg(theme.accent_primary)),
-            Span::raw("cycle focus between Preferences and Screen Saver list"),
-        ]),
-        Line::from(vec![
-            Span::styled("[↑/↓]     ", Style::default().fg(theme.accent_primary)),
-            Span::raw("navigate preferences or screensaver entries"),
-        ]),
-        Line::from(vec![
-            Span::styled("[←/→]     ", Style::default().fg(theme.accent_primary)),
-            Span::raw("adjust screensaver Timeout or Cycle Time"),
-        ]),
-        Line::from(vec![
-            Span::styled("[Space]   ", Style::default().fg(theme.accent_primary)),
-            Span::raw("toggle checkboxes or active system settings"),
-        ]),
-        Line::from(vec![
-            Span::styled("[Enter]   ", Style::default().fg(theme.accent_primary)),
-            Span::raw("apply highlighted screensaver configuration to registry"),
-        ]),
-        Line::from(vec![
-            Span::styled("[F5 / R]  ", Style::default().fg(theme.accent_primary)),
-            Span::raw("re-scan System32 and %APPDATA% directories for screensavers"),
-        ]),
-        Line::from(vec![
-            Span::styled("[P]       ", Style::default().fg(theme.accent_primary)),
-            Span::raw("launch a fullscreen preview of highlighted screensaver"),
-        ]),
-        Line::from(vec![
-            Span::styled("[C]       ", Style::default().fg(theme.accent_primary)),
-            Span::raw("open the native configuration settings window"),
-        ]),
-        Line::from(vec![
-            Span::styled("[D]       ", Style::default().fg(theme.accent_primary)),
-            Span::raw("delete downloaded screensavers from local system"),
-        ]),
-        Line::from(vec![
-            Span::styled("[V]       ", Style::default().fg(theme.accent_primary)),
-            Span::raw("toggle interactive vanity modes and animations"),
-        ]),
-        Line::from(vec![
-            Span::styled("[q / Esc] ", Style::default().fg(theme.accent_primary)),
-            Span::raw("quit the manager interface"),
-        ]),
+    let col1 = [
+        ("[Tab]", "cycle focus between preferences and list"),
+        ("[↑/↓]", "navigate preferences or screensavers"),
+        ("[←/→]", "adjust timeout or cycle time"),
+        ("[Space]", "toggle checkboxes or system active status"),
+        ("[Enter]", "apply config to registry"),
+        ("[/]", "filter screensavers by name"),
     ];
+
+    let col2 = [
+        ("[F5 / R]", "re-scan system screensavers"),
+        ("[P]", "launch fullscreen preview"),
+        ("[C]", "open native configuration"),
+        ("[D]", "delete screensaver from disk"),
+        ("[V]", "toggle interactive vanity"),
+        ("[q/Esc]", "quit manager interface"),
+    ];
+
+    let mut help_lines = vec![];
+    for i in 0..6 {
+        let (k1, d1) = col1[i];
+        let (k2, d2) = col2[i];
+        help_lines.push(Line::from(vec![
+            Span::styled(format!("  {:<9}", k1), Style::default().fg(theme.accent_primary)),
+            Span::raw(format!("{:<42}", d1)),
+            Span::styled(format!("  {:<10}", k2), Style::default().fg(theme.accent_primary)),
+            Span::raw(d2),
+        ]));
+    }
 
     frame.render_widget(Paragraph::new(help_lines).wrap(Wrap { trim: false }), inner);
 }
