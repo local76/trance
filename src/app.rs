@@ -877,6 +877,25 @@ impl App {
         }
     }
 
+    /// Check if the registry matches the global config, reload if out of sync.
+    pub fn check_registry_sync(&mut self) -> bool {
+        let current_reg = GlobalConfig::load();
+        if current_reg.active_scr != self.global.active_scr
+            || current_reg.active != self.global.active
+            || current_reg.timeout != self.global.timeout
+        {
+            self.global = current_reg;
+            self.status = Some(StatusMessage {
+                text: "External registry change detected! Config reloaded.".to_string(),
+                kind: StatusKind::Info,
+            });
+            self.update_list_items();
+            true
+        } else {
+            false
+        }
+    }
+
 }
 
 pub use ratatui::crossterm::event::{KeyCode, KeyModifiers};
@@ -905,6 +924,7 @@ pub fn run_random_cycle() {
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
+    let mut mask = None;
     loop {
         seed = seed
             .wrapping_mul(6364136223846793005)
@@ -915,6 +935,12 @@ pub fn run_random_cycle() {
             Ok(c) => c,
             Err(_) => break,
         };
+
+        if mask.is_some() {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            let _ = mask.take();
+        }
+
         let start = std::time::Instant::now();
         let mut exited = false;
         while start.elapsed() < cycle_duration {
@@ -933,6 +959,8 @@ pub fn run_random_cycle() {
         if exited {
             break;
         }
+        mask = crate::win32::CycleMask::new();
+        std::thread::sleep(std::time::Duration::from_millis(50));
         let _ = child.kill();
     }
 }
@@ -1328,5 +1356,18 @@ mod tests {
         app.toggle_highlighted_selection();
         assert!(app.download_state.is_some());
         assert_eq!(app.pending_action, Some(PendingAction::ToggleSelection));
+    }
+
+    #[test]
+    fn test_console_modes() {
+        println!("TESTING RAW MODES:");
+        match ratatui::crossterm::terminal::enable_raw_mode() {
+            Ok(_) => println!("  enable_raw_mode: OK"),
+            Err(e) => println!("  enable_raw_mode: ERROR: {}", e),
+        }
+        match ratatui::crossterm::terminal::disable_raw_mode() {
+            Ok(_) => println!("  disable_raw_mode: OK"),
+            Err(e) => println!("  disable_raw_mode: ERROR: {}", e),
+        }
     }
 }

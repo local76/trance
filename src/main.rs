@@ -79,7 +79,11 @@ enum Command {
         hwnd: Option<String>,
     },
     /// Check system configuration and diagnostic reports.
-    Doctor,
+    Doctor {
+        /// Attempt to fix any discovered issues automatically.
+        #[arg(long)]
+        fix: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -97,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::Stop => stop_all_screensavers(),
         Command::ToggleActive => toggle_active(),
         Command::Preview { hwnd } => run_active_screensaver_preview(hwnd).map_err(Into::into),
-        Command::Doctor => run_doctor(),
+        Command::Doctor { fix } => run_doctor(fix),
     };
 
     if let Err(ref e) = result {
@@ -230,6 +234,7 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
 
     let mut status_ttl: u32 = 0;
     let mut last_sleep_prevented = false;
+    let mut sync_check_timer: u32 = 0;
 
     loop {
         // Apply the sleep-inhibition state to the OS.  We only call into
@@ -340,19 +345,29 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
         let tick_ms = if has_event { elapsed_ms.max(1) } else { poll.as_millis() as u32 };
 
         if has_event {
-            match event::read()? {
-                Event::Key(key) if key.kind == KeyEventKind::Press => {
-                    let code: KeyCode = key.code;
-                    let mods: KeyModifiers = key.modifiers;
-                    if app.handle_key(code, mods) {
-                        break;
+            let ev = event::read()?;
+            tracing::info!(?ev, "Received event");
+            match ev {
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        let code: KeyCode = key.code;
+                        let mods: KeyModifiers = key.modifiers;
+                        tracing::info!(?code, ?mods, "Key press event");
+                        if app.handle_key(code, mods) {
+                            tracing::info!("app.handle_key returned true, breaking loop");
+                            break;
+                        }
+                        status_ttl = 7500;
+                    } else {
+                        tracing::info!(?key.kind, ?key.code, "Ignored non-press key event");
                     }
-                    status_ttl = 7500; // 7.5 seconds in ms
                 }
-                Event::Resize(_, _) => {
-                    // ratatui handles resize automatically on the next draw.
+                Event::Resize(w, h) => {
+                    tracing::info!(w, h, "Terminal resize event");
                 }
-                _ => {}
+                _ => {
+                    tracing::info!("Other event ignored");
+                }
             }
         }
 
@@ -366,12 +381,18 @@ fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error
                 }
             }
         }
+
+        sync_check_timer = sync_check_timer.saturating_add(tick_ms);
+        if sync_check_timer >= 2500 {
+            sync_check_timer = 0;
+            app.check_registry_sync();
+        }
     }
 
     // Release any sleep-inhibition we may have set, then restore the
     // terminal and console window.
     win32::set_thread_execution_state(false);
-    ratatui::crossterm::terminal::disable_raw_mode()?;
+    let _ = ratatui::crossterm::terminal::disable_raw_mode();
     ratatui::crossterm::execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
@@ -472,7 +493,7 @@ fn toggle_active() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
+fn run_doctor(fix: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("WSM Doctor — Diagnostic Report");
     println!("=============================");
 
@@ -486,15 +507,36 @@ fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. Check Active Screensaver
     print!("Active Screensaver Path: ");
-    let global = GlobalConfig::load();
+    let mut global = GlobalConfig::load();
     if global.active_scr.is_empty() {
         println!("None Configured");
+        if fix {
+            let discovered = preview::discover();
+            if !discovered.is_empty() {
+                let first_path = discovered[0].path.to_string_lossy().into_owned();
+                global.active_scr = first_path.clone();
+                if global.save().is_ok() {
+                    println!("    [FIXED] Set active screensaver to first discovered: {}", first_path);
+                }
+            }
+        }
     } else {
         let path = std::path::PathBuf::from(&global.active_scr);
         if path.exists() {
             println!("OK ({})", global.active_scr);
         } else {
             println!("MISSING FILE ({})", global.active_scr);
+            if fix {
+                let discovered = preview::discover();
+                let first_valid = discovered.iter().find(|s| s.path.exists());
+                if let Some(s) = first_valid {
+                    let new_path = s.path.to_string_lossy().into_owned();
+                    global.active_scr = new_path.clone();
+                    if global.save().is_ok() {
+                        println!("    [FIXED] Reset active screensaver to valid path: {}", new_path);
+                    }
+                }
+            }
         }
     }
 
@@ -509,6 +551,13 @@ fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
             "  - %APPDATA%/wsm/screensavers: {}",
             if exists { "EXISTS" } else { "NOT FOUND" }
         );
+        if !exists && fix {
+            if std::fs::create_dir_all(&wsm_dir).is_ok() {
+                println!("    [FIXED] Created directory: {:?}", wsm_dir);
+            } else {
+                println!("    [FAILED] Could not create directory: {:?}", wsm_dir);
+            }
+        }
     }
     if let Ok(sys_root) = std::env::var("SystemRoot") {
         let root_path = std::path::PathBuf::from(&sys_root);
@@ -559,19 +608,29 @@ fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Local Preferences Check
     println!("\nLocal Preferences Check:");
-    let local = LocalConfig::load();
+    let mut local = LocalConfig::load();
     println!("  - Prevent System Sleep:      {}", if local.prevent_sleep { "ENABLED (Active Awake)" } else { "DISABLED (Normal)" });
     println!("  - Random Cycle Duration:     {} seconds", local.random_cycle_secs);
     println!("  - Selected Cycle Screensavers ({}):", local.selected_paths.len());
     if local.selected_paths.is_empty() {
         println!("      (None selected; default cycle will cycle all discovered screensavers)");
     } else {
+        let mut missing_count = 0;
         for path in &local.selected_paths {
             let p = std::path::Path::new(path);
             let exists = p.exists();
+            if !exists {
+                missing_count += 1;
+            }
             let status = if exists { "OK" } else { "MISSING FILE" };
             let filename = p.file_name().and_then(|f| f.to_str()).unwrap_or(path);
             println!("      - {} [{}] ({})", filename, status, path);
+        }
+        if missing_count > 0 && fix {
+            local.selected_paths.retain(|path| std::path::Path::new(path).exists());
+            if local.save().is_ok() {
+                println!("    [FIXED] Removed {} missing screensaver(s) from cycle selection.", missing_count);
+            }
         }
     }
 
