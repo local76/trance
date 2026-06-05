@@ -931,6 +931,9 @@ impl App {
             KeyCode::Char('v') | KeyCode::Char('V') => {
                 self.toggle_vanity_mode();
             }
+            KeyCode::Char('?') | KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::F(1) => {
+                self.notice = Some("Tab: Focus │ Space: Toggle │ Enter: Apply │ P: Preview │ C: Config │ D: Delete │ V: Vanity │ /: Filter".to_string());
+            }
             _ => {}
         }
         self.should_quit

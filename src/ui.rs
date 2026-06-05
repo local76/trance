@@ -21,8 +21,8 @@ use crate::app::{App, FocusedSection, GlobalField};
 
 
 
-/// Number of rows reserved for the help block (2 borders + 6 content lines).
-const HELP_ROWS: u16 = 8;
+/// Number of rows reserved for the help block (2 borders + 7 content lines).
+const HELP_ROWS: u16 = 9;
 /// Number of rows reserved for the global-prefs block (2 borders + 5 content
 /// lines + 1 padding).
 const PREFS_ROWS: u16 = 9;
@@ -513,7 +513,7 @@ fn render_list(app: &mut App, frame: &mut Frame, area: Rect) {
 
 fn render_help(theme: crate::theme::TuiTheme, frame: &mut Frame, area: Rect) {
     let block = Block::default()
-        .title(Span::styled(" Keyboard Shortcuts ", Style::default().fg(theme.header)))
+        .title(Span::styled(" Help ", Style::default().fg(theme.header)))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme.border));
     let inner = block.inner(area);
@@ -526,6 +526,7 @@ fn render_help(theme: crate::theme::TuiTheme, frame: &mut Frame, area: Rect) {
         ("[Space]", "toggle checkboxes or system active status"),
         ("[Enter]", "apply config to registry"),
         ("[/]", "filter screensavers by name"),
+        ("[? / H]", "show popup help notice message"),
     ];
 
     let col2 = [
@@ -535,10 +536,11 @@ fn render_help(theme: crate::theme::TuiTheme, frame: &mut Frame, area: Rect) {
         ("[D]", "delete screensaver from disk"),
         ("[V]", "toggle interactive vanity"),
         ("[q/Esc]", "quit manager interface"),
+        ("", ""),
     ];
 
     let mut help_lines = vec![];
-    for i in 0..6 {
+    for i in 0..7 {
         let (k1, d1) = col1[i];
         let (k2, d2) = col2[i];
         help_lines.push(Line::from(vec![
