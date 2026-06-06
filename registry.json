@@ -1,131 +1,91 @@
 [
   {
-    "name": "beams",
+    "name": "rBeams",
     "author": "UberMetroid",
     "description": "Sweeping vertical colored spotlights in purple, blue, and pink. Now features a live dynamic OS name and kernel subtext logo.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/beams/windows/beams.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/beams/linux/beams",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/beams/linux/beams.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/beams/linux/beams.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/beams/linux/beams.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rBeams/rBeams.scr"
     },
     "version": "main"
   },
   {
-    "name": "bhop",
+    "name": "rBhop",
     "author": "UberMetroid",
     "description": "Cyberpunk Neon Pink and Cyan Hacker TUI with scrolling live Bhop game panel and full system diagnostics (including GPUs and monitors).",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/bhop/windows/bhop.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/bhop/linux/bhop",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/bhop/linux/bhop.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/bhop/linux/bhop.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/bhop/linux/bhop.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rBhop/rBhop.scr"
     },
     "version": "main"
   },
   {
-    "name": "fire",
+    "name": "rFire",
     "author": "UberMetroid",
     "description": "Majestic Doom fire simulation sweeping upward, reacting to system load with a live dynamic OS logo.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fire/windows/fire.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fire/linux/fire",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fire/linux/fire.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fire/linux/fire.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fire/linux/fire.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rFire/rFire.scr"
     },
     "version": "main"
   },
   {
-    "name": "fireworks",
+    "name": "rFireworks",
     "author": "UberMetroid",
     "description": "Cozy city skyline silhouette with warm lit windows and exploding fireworks illuminating the live OS logo.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireworks/windows/fireworks.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireworks/linux/fireworks",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireworks/linux/fireworks.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireworks/linux/fireworks.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireworks/linux/fireworks.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rFireworks/rFireworks.scr"
     },
     "version": "main"
   },
   {
-    "name": "life",
+    "name": "rLife",
     "author": "UberMetroid",
     "description": "Conway's Game of Life simulated on a grid with nebula trails, interacting with the live dynamic OS logo.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/life/windows/life.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/life/linux/life",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/life/linux/life.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/life/linux/life.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/life/linux/life.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rLife/rLife.scr"
     },
     "version": "main"
   },
   {
-    "name": "matrix",
+    "name": "rMatrix",
     "author": "UberMetroid",
     "description": "Dense Matrix-style falling digital rain using system environment variables and live system data, over the dynamic OS logo.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/matrix/windows/matrix.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/matrix/linux/matrix",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/matrix/linux/matrix.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/matrix/linux/matrix.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/matrix/linux/matrix.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rMatrix/rMatrix.scr"
     },
     "version": "main"
   },
   {
-    "name": "party",
+    "name": "rParty",
     "author": "UberMetroid",
     "description": "Rave party simulation featuring twinkling background stars, a disco ball, and the live dynamic OS logo.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/party/windows/party.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/party/linux/party",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/party/linux/party.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/party/linux/party.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/party/linux/party.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rParty/rParty.scr"
     },
     "version": "main"
   },
   {
-    "name": "pour",
+    "name": "rPour",
     "author": "UberMetroid",
     "description": "Waterfall cascade of characters (including live system data) assembling the dynamic OS logo and kernel.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/pour/windows/pour.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/pour/linux/pour",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/pour/linux/pour.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/pour/linux/pour.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/pour/linux/pour.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rPour/rPour.scr"
     },
     "version": "main"
   },
   {
-    "name": "unstable",
+    "name": "rUnstable",
     "author": "UberMetroid",
     "description": "A dynamic OS logo exploding outward into chaotic particles (with new explosion types and side effects) and snapping back.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/unstable/windows/unstable.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/unstable/linux/unstable",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/unstable/linux/unstable.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/unstable/linux/unstable.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/unstable/linux/unstable.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rUnstable/rUnstable.scr"
     },
     "version": "main"
   },
   {
-    "name": "fireflies",
+    "name": "rFireflies",
     "author": "UberMetroid",
     "description": "Harmonious pulsing Lissajous particle orbits with glowing wireframe connector lines, dynamically adjusting to system DWM colors.",
     "downloads": {
-      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireflies/windows/fireflies.scr",
-      "linux": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireflies/linux/fireflies",
-      "linux-deb": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireflies/linux/fireflies.deb",
-      "linux-rpm": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireflies/linux/fireflies.rpm",
-      "linux-arch": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/fireflies/linux/fireflies.pkg.tar.zst"
+      "windows": "https://raw.githubusercontent.com/tourian-dynamics/rScreensavers/main/screensavers/rFireflies/rFireflies.scr"
     },
     "version": "main"
   }

@@ -812,6 +812,7 @@ dependencies = [
 [[package]]
 name = "rcommon"
 version = "0.1.0"
+source = "git+https://github.com/tourian-dynamics/rCommon.git?branch=main#49ea4fd90fcb94a818edbe496f3b37e8b3f7a76b"
 dependencies = [
  "crossterm",
  "ratatui",
