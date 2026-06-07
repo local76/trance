@@ -77,6 +77,13 @@ fn search_dirs() -> Vec<PathBuf> {
 
 fn prettify(path: &Path) -> String {
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    if stem.len() >= 2 && stem.starts_with('r') {
+        if let Some(second_char) = stem.chars().nth(1) {
+            if second_char.is_uppercase() {
+                return stem.to_string();
+            }
+        }
+    }
     let mut chars = stem.chars();
     match chars.next() {
         None => String::new(),
@@ -113,6 +120,8 @@ mod tests {
             "Mystify"
         );
         assert_eq!(prettify(Path::new("bubbles.scr")), "Bubbles");
+        assert_eq!(prettify(Path::new("rFire.scr")), "rFire");
+        assert_eq!(prettify(Path::new("rLife.scr")), "rLife");
         assert_eq!(prettify(Path::new("")), "");
         assert_eq!(prettify(Path::new(".scr")), ".scr");
     }
