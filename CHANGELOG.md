@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.6.9] - 2026-06-09
+## [2026.06.09] - 2026-06-09
 
 ### Renamed
 - **Project rename**: `trance` was previously `trance-tui` / `rIdle`. The Cargo package name, binary name, file paths, registry keys, AppData paths, and docs are now lowercase `trance`. Behavior and features are unchanged.
