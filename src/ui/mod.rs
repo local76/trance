@@ -7,10 +7,11 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use library::interface::tui::design::centered_rect;
 
 use crate::app::App;
 
-pub mod panels;
+pub mod widgets;
 pub mod utils;
 
 pub use utils::truncate;
@@ -121,10 +122,10 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     frame.render_widget(Paragraph::new(header_line), header_inner);
 
     // 1. Render Global Screensaver Preferences (full width)
-    panels::render_prefs(app, frame, chunks[1]);
+    widgets::render_prefs(app, frame, chunks[1]);
 
     // 2. Render Screensaver Preferences List Table
-    panels::render_list(app, frame, chunks[2]);
+    widgets::render_list(app, frame, chunks[2]);
 
     // 3. Render Footer Status Box
     let footer_block = Block::default()
@@ -506,26 +507,4 @@ fn render_too_small(theme: crate::theme::TuiTheme, frame: &mut Frame, area: Rect
     );
 }
 
-fn centered_rect(
-    percent_x: u16,
-    percent_y: u16,
-    r: Rect,
-) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
 
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
-}

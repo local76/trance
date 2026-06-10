@@ -10,7 +10,7 @@ use winreg::RegKey;
 use winreg::enums::HKEY_CURRENT_USER;
 
 use crate::config::{GlobalConfig, LocalConfig};
-use crate::preview;
+use crate::backend::preview;
 use crate::theme::TuiTheme;
 use crate::win32;
 
@@ -85,11 +85,12 @@ pub fn run_doctor(fix: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("\nDiscovery Directories:");
     if let Ok(appdata) = std::env::var("APPDATA") {
         let rsaver_dir = PathBuf::from(appdata)
+            .join("local76")
             .join("trance")
             .join("screensavers");
         let exists = rsaver_dir.exists();
         println!(
-            "  - %APPDATA%/trance/screensavers: {}",
+            "  - %APPDATA%/local76/trance/screensavers: {}",
             if exists { "EXISTS" } else { "NOT FOUND" }
         );
         if !exists && fix {

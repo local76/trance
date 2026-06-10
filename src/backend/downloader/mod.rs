@@ -240,7 +240,7 @@ pub fn spawn_download(entry: &RegistryEntry) -> Arc<Mutex<DownloadState>> {
                 .ok()
                 .map(PathBuf::from)
                 .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local/share")))
-                .map(|p| p.join("trance"))
+                .map(|p| p.join("local76").join("trance"))
         };
 
         base.map(|parent| {
@@ -277,6 +277,9 @@ pub fn spawn_download(entry: &RegistryEntry) -> Arc<Mutex<DownloadState>> {
 
                 let mut buffer = [0; 8192];
                 loop {
+                    if library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+                        return Err("Download cancelled: Application shutting down".into());
+                    }
                     let bytes_read = src_file.read(&mut buffer)?;
                     if bytes_read == 0 {
                         break;
@@ -308,6 +311,9 @@ pub fn spawn_download(entry: &RegistryEntry) -> Arc<Mutex<DownloadState>> {
                 let mut buffer = [0; 8192];
 
                 loop {
+                    if library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+                        return Err("Download cancelled: Application shutting down".into());
+                    }
                     let bytes_read = reader.read(&mut buffer)?;
                     if bytes_read == 0 {
                         break;

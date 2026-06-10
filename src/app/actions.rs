@@ -6,6 +6,10 @@ use crate::app::{App, StatusMessage, StatusKind};
 #[cfg(feature = "downloader")]
 use crate::app::PendingAction;
 
+#[cfg(feature = "downloader")]
+use crate::backend::downloader;
+use crate::backend::preview;
+
 const TIMEOUT_STEP_SECS: u32 = 60;
 const TIMEOUT_MIN_SECS: u32 = 60;
 const TIMEOUT_MAX_SECS: u32 = 7200;
@@ -134,7 +138,7 @@ impl App {
         if self.local.hide_stock {
             // If stock screensavers are hidden, they should not be active in the cycle.
             self.local.selected_paths.retain(|p| {
-                !crate::preview::is_stock_screensaver(std::path::Path::new(p))
+                !preview::is_stock_screensaver(std::path::Path::new(p))
             });
         }
         if let Some(s) = self.current_screensaver() {
@@ -194,7 +198,7 @@ impl App {
 
     /// Re-discover screensavers and refresh the list.
     pub fn refresh_screensavers(&mut self) {
-        self.screensavers = crate::preview::discover();
+        self.screensavers = preview::discover();
         #[cfg(feature = "downloader")]
         {
             let entries = self.registry_entries.clone();
@@ -258,7 +262,7 @@ impl App {
             (s.path.clone(), s.name.clone())
         };
 
-        if crate::preview::is_stock_screensaver(&path) {
+        if preview::is_stock_screensaver(&path) {
             self.status = Some(StatusMessage {
                 text: "Cannot delete stock Windows screensavers.".to_string(),
                 kind: StatusKind::Error,
@@ -298,7 +302,7 @@ impl App {
 
     /// Merge online screensaver entries into local list.
     #[cfg(feature = "downloader")]
-    pub fn merge_registry_entries(&mut self, entries: Vec<crate::downloader::RegistryEntry>) {
+    pub fn merge_registry_entries(&mut self, entries: Vec<downloader::RegistryEntry>) {
         self.registry_entries = entries.clone();
 
         let local_filenames: std::collections::HashSet<String> = self.screensavers.iter()
@@ -326,7 +330,7 @@ impl App {
                 }))
                 .unwrap_or_else(|| std::path::PathBuf::from(&filename));
 
-            self.screensavers.push(crate::preview::Screensaver {
+            self.screensavers.push(preview::Screensaver {
                 name: entry.name,
                 path,
                 download_url: Some(url),
@@ -345,7 +349,7 @@ impl App {
         if let Some(s) = self.current_screensaver() {
             if s.download_url.is_some() && !s.path.exists() {
                 if let Some(ref url) = s.download_url {
-                    let entry = crate::downloader::RegistryEntry {
+                    let entry = downloader::RegistryEntry {
                         name: s.name.clone(),
                         author: String::new(),
                         description: String::new(),
@@ -354,7 +358,7 @@ impl App {
                         version: String::new(),
                     };
                     self.pending_action = Some(action);
-                    self.download_state = Some(crate::downloader::spawn_download(&entry));
+                    self.download_state = Some(downloader::spawn_download(&entry));
                     self.visual_progress = 0.0;
                     return true;
                 }

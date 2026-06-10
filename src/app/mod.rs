@@ -3,8 +3,12 @@
 //! **Taxonomy Classification**: Interface (TUI / State Coordination).
 
 use crate::config::{GlobalConfig, LocalConfig};
-use crate::preview::Screensaver;
+use crate::backend::preview::Screensaver;
 use crate::theme::TuiTheme;
+
+#[cfg(feature = "downloader")]
+use crate::backend::downloader;
+use crate::backend::preview;
 
 pub mod actions;
 pub mod cycle;
@@ -118,13 +122,13 @@ pub struct App {
     pub visual_progress: f64,
     /// Active download worker state.
     #[cfg(feature = "downloader")]
-    pub download_state: Option<std::sync::Arc<std::sync::Mutex<crate::downloader::DownloadState>>>,
+    pub download_state: Option<std::sync::Arc<std::sync::Mutex<downloader::DownloadState>>>,
     /// Registry feed worker fetch results.
     #[cfg(feature = "downloader")]
-    pub registry_results: Option<std::sync::Arc<std::sync::Mutex<Option<Vec<crate::downloader::RegistryEntry>>>>>,
+    pub registry_results: Option<std::sync::Arc<std::sync::Mutex<Option<Vec<downloader::RegistryEntry>>>>>,
     /// Curated registry catalog items.
     #[cfg(feature = "downloader")]
-    pub registry_entries: Vec<crate::downloader::RegistryEntry>,
+    pub registry_entries: Vec<downloader::RegistryEntry>,
     /// Action to execute once download succeeds.
     #[cfg(feature = "downloader")]
     pub pending_action: Option<PendingAction>,
@@ -175,7 +179,7 @@ impl App {
         if local.hide_stock {
             let orig_len = local.selected_paths.len();
             local.selected_paths.retain(|p| {
-                !crate::preview::is_stock_screensaver(std::path::Path::new(p))
+                !preview::is_stock_screensaver(std::path::Path::new(p))
             });
             if local.selected_paths.len() != orig_len {
                 let _ = local.save();
@@ -198,30 +202,44 @@ impl App {
             let state = std::sync::Arc::new(std::sync::Mutex::new(None));
             let thread_state = state.clone();
             let feed_urls = local.feed_urls.clone();
-            std::thread::spawn(move || {
-                let mut all_entries = Vec::new();
-                if let Ok(local_entries) = crate::downloader::load_local_registry() {
-                    for entry in local_entries {
-                        if !all_entries.iter().any(|e: &crate::downloader::RegistryEntry| e.name.eq_ignore_ascii_case(&entry.name)) {
-                            all_entries.push(entry);
-                        }
+            if !library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+                std::thread::spawn(move || {
+                    if library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+                        return;
                     }
-                }
-                for url in feed_urls {
-                    if let Ok(entries) = crate::downloader::fetch_registry(&url) {
-                        for entry in entries {
-                            if !all_entries.iter().any(|e: &crate::downloader::RegistryEntry| e.name.eq_ignore_ascii_case(&entry.name)) {
+                    let mut all_entries = Vec::new();
+                    if let Ok(local_entries) = downloader::load_local_registry() {
+                        for entry in local_entries {
+                            if library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+                                return;
+                            }
+                            if !all_entries.iter().any(|e: &downloader::RegistryEntry| e.name.eq_ignore_ascii_case(&entry.name)) {
                                 all_entries.push(entry);
                             }
                         }
                     }
-                }
-                if !all_entries.is_empty() {
-                    if let Ok(mut lock) = thread_state.lock() {
-                        *lock = Some(all_entries);
+                    for url in feed_urls {
+                        if library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+                            return;
+                        }
+                        if let Ok(entries) = downloader::fetch_registry(&url) {
+                            for entry in entries {
+                                if library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+                                    return;
+                                }
+                                if !all_entries.iter().any(|e: &downloader::RegistryEntry| e.name.eq_ignore_ascii_case(&entry.name)) {
+                                    all_entries.push(entry);
+                                }
+                            }
+                        }
                     }
-                }
-            });
+                    if !all_entries.is_empty() {
+                        if let Ok(mut lock) = thread_state.lock() {
+                            *lock = Some(all_entries);
+                        }
+                    }
+                });
+            }
             Some(state)
         };
 
@@ -275,7 +293,7 @@ impl App {
         if self.local.hide_stock {
             indices
                 .into_iter()
-                .filter(|&i| !crate::preview::is_stock_screensaver(&self.screensavers[i].path))
+                .filter(|&i| !preview::is_stock_screensaver(&self.screensavers[i].path))
                 .collect()
         } else {
             indices
@@ -306,7 +324,7 @@ impl App {
                 let is_checked = self.local.selected_paths.contains(&s.path.to_string_lossy().into_owned());
                 let exists = s.path.exists();
                 let is_online = s.download_url.is_some() && !exists;
-                let is_stock = crate::preview::is_stock_screensaver(&s.path);
+                let is_stock = preview::is_stock_screensaver(&s.path);
 
                 let active_str = if is_checked { "yes" } else { "no" };
                 let active_color = if is_checked { theme.applied } else { theme.text_dim };
@@ -533,7 +551,7 @@ mod tests {
         assert_eq!(app.screensavers.len(), 3);
 
         let entries = vec![
-            crate::downloader::RegistryEntry {
+            downloader::RegistryEntry {
                 name: "beams".to_string(),
                 author: "UberMetroid".to_string(),
                 description: "Beams screensaver".to_string(),

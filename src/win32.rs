@@ -12,7 +12,7 @@ pub use library::window::{
     center_console_window, query_cursor_pos, get_window_rect, set_window_pos,
     BorderlessConsole, SingleInstanceGuard,
 };
-pub use crate::saver_win32::query_power_status;
-pub use crate::saver_win32::PowerStatus;
-pub use crate::saver_win32::RECT;
-pub use crate::saver_win32::*;
+pub use crate::backend::saver_win32::query_power_status;
+pub use crate::backend::saver_win32::PowerStatus;
+pub use crate::backend::saver_win32::RECT;
+pub use crate::backend::saver_win32::*;

@@ -6,35 +6,16 @@
 #![warn(missing_docs)]
 
 mod app;
+mod backend;
 mod config;
 mod doctor;
-mod preview;
-mod runner;
 mod theme;
 mod ui;
 mod win32;
-#[cfg(target_os = "windows")]
-mod saver_win32;
 
-#[cfg(not(target_os = "windows"))]
-#[path = "saver_stub.rs"]
-mod saver_win32;
-
-#[cfg(feature = "downloader")]
-#[cfg(target_os = "windows")]
-pub mod downloader;
-
-#[cfg(feature = "downloader")]
-#[cfg(not(target_os = "windows"))]
-#[path = "downloader_stub.rs"]
-pub mod downloader;
-
-use std::io::{stdout, Write};
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use ratatui::crossterm::event::DisableMouseCapture;
-use ratatui::crossterm::terminal::LeaveAlternateScreen;
 use tracing::{error, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::EnvFilter;
@@ -94,13 +75,12 @@ enum Command {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = init_tracing();
-    install_panic_hook();
     let cli = Cli::parse_from(pre_munge_args(std::env::args().collect()));
     info!(?cli, "trance start");
 
     let command = cli.command.unwrap_or(Command::Tui);
     let result: Result<(), Box<dyn std::error::Error>> = match command {
-        Command::Tui | Command::Configure => runner::run_tui(cli.theme.as_deref()),
+        Command::Tui | Command::Configure => backend::run_tui(cli.theme.as_deref()),
         Command::Run | Command::Lock => {
             run_active_screensaver(matches!(command, Command::Lock)).map_err(Into::into)
         }
@@ -171,36 +151,6 @@ fn init_tracing() -> WorkerGuard {
     guard
 }
 
-/// Install a panic hook that restores the terminal before delegating to the
-/// default handler.  Without this, a panic inside `run_tui` would leave the
-/// user stuck in raw mode.
-fn install_panic_hook() {
-    let original = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        let msg = info
-            .payload()
-            .downcast_ref::<&str>()
-            .copied()
-            .or_else(|| info.payload().downcast_ref::<String>().map(|s| s.as_str()))
-            .unwrap_or("unknown panic");
-        let loc = info
-            .location()
-            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
-            .unwrap_or_default();
-        error!("Panic occurred at {}: {}", loc, msg);
-
-        let _ = ratatui::crossterm::terminal::disable_raw_mode();
-        let mut out = stdout();
-        let _ = ratatui::crossterm::execute!(
-            out,
-            LeaveAlternateScreen,
-            ratatui::crossterm::cursor::Show,
-            DisableMouseCapture
-        );
-        let _ = out.flush();
-        original(info);
-    }));
-}
 
 fn run_active_screensaver(lock_first: bool) -> std::io::Result<()> {
     if lock_first {
@@ -257,7 +207,7 @@ fn run_active_screensaver_preview(hwnd: Option<String>) -> std::io::Result<()> {
 }
 
 fn stop_all_screensavers() -> Result<(), Box<dyn std::error::Error>> {
-    for s in preview::discover() {
+    for s in backend::preview::discover() {
         if let Some(filename) = s.path.file_name().and_then(|f| f.to_str()) {
             let _ = std::process::Command::new("taskkill")
                 .args(["/F", "/IM", filename])

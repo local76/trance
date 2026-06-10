@@ -62,7 +62,7 @@ fn search_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
 
     if let Ok(appdata) = std::env::var("APPDATA") {
-        dirs.push(PathBuf::from(appdata).join("trance").join("screensavers"));
+        dirs.push(PathBuf::from(appdata).join("local76").join("trance").join("screensavers"));
     }
 
     if let Ok(system_root) = std::env::var("SystemRoot") {
@@ -120,8 +120,8 @@ mod tests {
             "Mystify"
         );
         assert_eq!(prettify(Path::new("bubbles.scr")), "Bubbles");
-        assert_eq!(prettify(Path::new("flame.scr")), "flame");
-        assert_eq!(prettify(Path::new("cosmos.scr")), "cosmos");
+        assert_eq!(prettify(Path::new("flame.scr")), "Flame");
+        assert_eq!(prettify(Path::new("cosmos.scr")), "Cosmos");
         assert_eq!(prettify(Path::new("")), "");
         assert_eq!(prettify(Path::new(".scr")), ".scr");
     }

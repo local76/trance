@@ -2,45 +2,40 @@
 //!
 //! **Taxonomy Classification**: Interface (TUI / Presentation Layer).
 
-use std::io::stdout;
+
 use std::time::Duration;
 use tracing::info;
 
-use ratatui::Terminal;
-use ratatui::backend::CrosstermBackend;
-use ratatui::crossterm::event::{self, Event, KeyEventKind, EnableMouseCapture, DisableMouseCapture};
-use ratatui::crossterm::terminal::LeaveAlternateScreen;
+use library::lifecycle::foreground::tui_bootstrap::{bootstrap_tui, shutdown_tui, TuiBootstrapConfig};
+use ratatui::crossterm::event::{self, Event, KeyEventKind};
+
+pub mod preview;
+
+#[cfg(target_os = "windows")]
+#[path = "saver/win32.rs"]
+pub mod saver_win32;
+
+#[cfg(not(target_os = "windows"))]
+#[path = "saver/stub.rs"]
+pub mod saver_win32;
+
+#[cfg(feature = "downloader")]
+#[cfg(target_os = "windows")]
+#[path = "downloader/mod.rs"]
+pub mod downloader;
+
+#[cfg(feature = "downloader")]
+#[cfg(not(target_os = "windows"))]
+#[path = "downloader/stub.rs"]
+pub mod downloader;
 
 use crate::app::{App, KeyCode, KeyModifiers};
 use crate::config::{GlobalConfig, LocalConfig};
-use crate::preview;
 use crate::theme::TuiTheme;
 use crate::ui;
 use crate::win32;
 
-/// Console title manager that restores the title on drop.
-pub struct ConsoleTitleGuard {
-    original_title: Option<String>,
-}
 
-impl ConsoleTitleGuard {
-    /// Create a new guard and set the console title.
-    pub fn new(new_title: &str) -> Self {
-        let original_title = win32::get_console_title().ok();
-        if original_title.is_some() {
-            let _ = win32::set_console_title(new_title);
-        }
-        ConsoleTitleGuard { original_title }
-    }
-}
-
-impl Drop for ConsoleTitleGuard {
-    fn drop(&mut self) {
-        if let Some(ref title) = self.original_title {
-            let _ = win32::set_console_title(title);
-        }
-    }
-}
 
 /// Run the screensaver manager interactive TUI.
 pub fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
@@ -54,15 +49,10 @@ pub fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::E
         std::process::exit(0);
     }
 
-    let _instance_guard = match win32::SingleInstanceGuard::try_new() {
-        Ok(g) => g,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let mut tui_config = TuiBootstrapConfig::new("trance");
+    tui_config.size = (100, 35);
 
-    let _title_guard = ConsoleTitleGuard::new("trance");
+    let (mut terminal, _guards) = bootstrap_tui(tui_config)?;
 
     let screensavers = preview::discover();
 
@@ -73,29 +63,14 @@ pub fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::E
 
     let mut app = App::new(screensavers, global, local, theme);
 
-    ratatui::crossterm::terminal::enable_raw_mode()?;
-    let mut out = stdout();
-    let _ = ratatui::crossterm::execute!(out, ratatui::crossterm::terminal::SetSize(100, 35));
-    ratatui::crossterm::execute!(
-        out,
-        ratatui::crossterm::terminal::EnterAlternateScreen,
-        ratatui::crossterm::cursor::Hide,
-        EnableMouseCapture
-    )?;
-
-    // Allow Win32 window style/size changes to propagate to the console buffer
-    std::thread::sleep(std::time::Duration::from_millis(50));
-
-    win32::center_console_window();
-
-    let backend = CrosstermBackend::new(out);
-    let mut terminal = Terminal::new(backend)?;
-
     let mut status_ttl: u32 = 0;
     let mut last_sleep_prevented = false;
     let mut sync_check_timer: u32 = 0;
 
     loop {
+        if library::lifecycle::foreground::tui_bootstrap::is_app_shutting_down() {
+            break;
+        }
         if app.should_quit {
             break;
         }
@@ -135,17 +110,17 @@ pub fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::E
                     downloaded_name = state.name.clone();
                     post_install = state.post_install_command.clone();
                     match state.status {
-                        crate::downloader::DownloadStatus::Success => {
+                        crate::backend::downloader::DownloadStatus::Success => {
                             if app.visual_progress >= 1.0 {
                                 reset_state = true;
                                 download_success = true;
                             }
                         }
-                        crate::downloader::DownloadStatus::Error(ref err) => {
+                        crate::backend::downloader::DownloadStatus::Error(ref err) => {
                             reset_state = true;
                             err_msg = Some(err.clone());
                         }
-                        crate::downloader::DownloadStatus::Downloading => {}
+                        crate::backend::downloader::DownloadStatus::Downloading => {}
                     }
                 }
             }
@@ -390,13 +365,7 @@ pub fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::E
     // Release any sleep-inhibition we may have set, then restore the
     // terminal and console window.
     win32::set_thread_execution_state(false);
-    let _ = ratatui::crossterm::terminal::disable_raw_mode();
-    ratatui::crossterm::execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        ratatui::crossterm::cursor::Show,
-        DisableMouseCapture
-    )?;
+    shutdown_tui(&mut terminal)?;
     Ok(())
 }
 
