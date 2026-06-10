@@ -4,7 +4,7 @@ version = "2026.6.11"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT"
-description = "TUI Windows screensaver manager"
+description = "Windows screensaver manager"
 
 [dependencies]
 ratatui = { version = "0.30", default-features = false, features = ["termwiz"] }

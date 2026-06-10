@@ -384,7 +384,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         help_text.push(Line::from(""));
         help_text.extend(text_format::format_help_row(
             "CLI Subcommands",
-            "trance.exe [tui | run | stop | toggle-active | lock | configure | preview | doctor]",
+            "trance.exe [tui | doctor]",
             max_desc_width,
             &theme,
         ));

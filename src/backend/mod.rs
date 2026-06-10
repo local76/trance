@@ -1,6 +1,6 @@
-//! Main event loop and TUI runner for trance.
+//! Main event loop and UI runner for trance.
 //!
-//! **Taxonomy Classification**: Interface (TUI / Presentation Layer).
+//! **Taxonomy Classification**: Interface (UI / Presentation Layer).
 
 
 use std::time::Duration;
@@ -30,7 +30,7 @@ use crate::win32;
 
 
 /// Run the screensaver manager interactive app.
-pub fn run_tui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_ui(theme_override: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
     use crossterm::tty::IsTty;
     if !std::io::stdin().is_tty() {
         return Err("Interactive app requires a TTY stdin.".into());

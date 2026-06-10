@@ -1,6 +1,6 @@
 //! trance — Windows Screensaver Manager.
 //!
-//! Standalone TUI for configuring any Windows screensaver.
+//! Standalone UI for configuring any Windows screensaver.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
@@ -28,10 +28,10 @@ use crate::config::LocalConfig;
     version,
     about,
     long_about = None,
-    after_help = "ENVIRONMENT VARIABLES:\n  RUST_LOG  Set log level (error, warn, info, debug, trace)\n  NO_COLOR  Disable TUI color rendering"
+    after_help = "ENVIRONMENT VARIABLES:\n  RUST_LOG  Set log level (error, warn, info, debug, trace)\n  NO_COLOR  Disable UI color rendering"
 )]
 struct Cli {
-    /// Force TUI theme: dark, light, high-contrast, no-color
+    /// Force UI theme: dark, light, high-contrast, no-color
     #[arg(long, value_name = "THEME")]
     theme: Option<String>,
 
@@ -41,7 +41,7 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Launch the app dashboard (default).
-    Tui,
+    Ui,
     /// Check system configuration and diagnostic reports.
     Doctor {
         /// Attempt to fix any discovered issues automatically.
@@ -55,9 +55,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     info!(?cli, "trance start");
 
-    let command = cli.command.unwrap_or(Command::Tui);
+    let command = cli.command.unwrap_or(Command::Ui);
     let result: Result<(), Box<dyn std::error::Error>> = match command {
-        Command::Tui => backend::run_tui(cli.theme.as_deref()),
+        Command::Ui => backend::run_ui(cli.theme.as_deref()),
         Command::Doctor { fix } => doctor::run_doctor(fix),
     };
 
@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Initialize a file-based tracing subscriber so logs don't interfere with
-/// the TUI.
+/// the UI.
 fn init_tracing() -> WorkerGuard {
     let log_path = LocalConfig::config_path()
         .and_then(|p| p.parent().map(|p| p.join("trance.log")))
