@@ -89,6 +89,15 @@ mod fallback_impl {
     }
     pub fn query_dark_mode() -> bool { true }
     
+    fn read_limited_string<P: AsRef<std::path::Path>>(path: P, max_bytes: usize) -> std::io::Result<String> {
+        use std::io::Read;
+        let file = std::fs::File::open(path)?;
+        let mut handle = file.take(max_bytes as u64);
+        let mut dst = String::new();
+        handle.read_to_string(&mut dst)?;
+        Ok(dst)
+    }
+    
     pub fn query_power_status() -> Option<PowerStatus> {
         let mut ac_online = true;
         let mut has_ac = false;
@@ -96,10 +105,10 @@ mod fallback_impl {
         if let Ok(entries) = std::fs::read_dir("/sys/class/power_supply") {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if let Ok(ty_str) = std::fs::read_to_string(path.join("type")) {
+                if let Ok(ty_str) = read_limited_string(path.join("type"), 64) {
                     match ty_str.trim() {
                         "Mains" => {
-                            if let Ok(online_str) = std::fs::read_to_string(path.join("online")) {
+                            if let Ok(online_str) = read_limited_string(path.join("online"), 16) {
                                 let online = online_str.trim() == "1";
                                 if !has_ac {
                                     ac_online = online;
@@ -110,7 +119,7 @@ mod fallback_impl {
                             }
                         }
                         "Battery" => {
-                            if let Ok(cap_str) = std::fs::read_to_string(path.join("capacity")) {
+                            if let Ok(cap_str) = read_limited_string(path.join("capacity"), 16) {
                                 if let Ok(pct) = cap_str.trim().parse::<u8>() {
                                     battery_percent = Some(pct);
                                 }
@@ -128,17 +137,17 @@ mod fallback_impl {
     }
 
     pub fn query_bios_info() -> Option<SystemBiosInfo> {
-        let manufacturer = std::fs::read_to_string("/sys/class/dmi/id/sys_vendor")
+        let manufacturer = read_limited_string("/sys/class/dmi/id/sys_vendor", 256)
             .ok()
             .unwrap_or_default()
             .trim()
             .to_string();
-        let product = std::fs::read_to_string("/sys/class/dmi/id/product_name")
+        let product = read_limited_string("/sys/class/dmi/id/product_name", 256)
             .ok()
             .unwrap_or_default()
             .trim()
             .to_string();
-        let model = std::fs::read_to_string("/sys/class/dmi/id/product_version")
+        let model = read_limited_string("/sys/class/dmi/id/product_version", 256)
             .ok()
             .unwrap_or_default()
             .trim()
@@ -182,45 +191,15 @@ mod fallback_impl {
         }
     }
 
-    #[repr(C)]
-    struct Tm {
-        tm_sec: i32,
-        tm_min: i32,
-        tm_hour: i32,
-        tm_mday: i32,
-        tm_mon: i32,
-        tm_year: i32,
-        tm_wday: i32,
-        tm_yday: i32,
-        tm_isdst: i32,
-        tm_gmtoff: i64,
-        tm_zone: *const u8,
-    }
-
-    unsafe extern "C" {
-        fn time(time: *mut i64) -> i64;
-        fn localtime_r(timep: *const i64, result: *mut Tm) -> *mut Tm;
-    }
-
     pub fn get_local_time_string() -> String {
-        unsafe {
-            let mut t = 0i64;
-            time(&mut t);
-            let mut tm = std::mem::zeroed::<Tm>();
-            if !localtime_r(&t, &mut tm).is_null() {
-                format!(
-                    "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-                    tm.tm_year + 1900,
-                    tm.tm_mon + 1,
-                    tm.tm_mday,
-                    tm.tm_hour,
-                    tm.tm_min,
-                    tm.tm_sec
-                )
-            } else {
-                "2026-06-06 12:00:00".to_string()
+        if let Ok(output) = std::process::Command::new("date").arg("+%Y-%m-%d %H:%M:%S").output() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            let trimmed = s.trim().to_string();
+            if trimmed.len() == 19 {
+                return trimmed;
             }
         }
+        "2026-06-06 12:00:00".to_string()
     }
 }
 
