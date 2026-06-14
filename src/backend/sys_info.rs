@@ -88,16 +88,139 @@ mod fallback_impl {
         "Linux".to_string()
     }
     pub fn query_dark_mode() -> bool { true }
+    
     pub fn query_power_status() -> Option<PowerStatus> {
-        Some(PowerStatus {
-            ac_online: true,
-            battery_percent: 100,
+        let mut ac_online = true;
+        let mut has_ac = false;
+        let mut battery_percent: Option<u8> = None;
+        if let Ok(entries) = std::fs::read_dir("/sys/class/power_supply") {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Ok(ty_str) = std::fs::read_to_string(path.join("type")) {
+                    match ty_str.trim() {
+                        "Mains" => {
+                            if let Ok(online_str) = std::fs::read_to_string(path.join("online")) {
+                                let online = online_str.trim() == "1";
+                                if !has_ac {
+                                    ac_online = online;
+                                    has_ac = true;
+                                } else {
+                                    ac_online = ac_online || online;
+                                }
+                            }
+                        }
+                        "Battery" => {
+                            if let Ok(cap_str) = std::fs::read_to_string(path.join("capacity")) {
+                                if let Ok(pct) = cap_str.trim().parse::<u8>() {
+                                    battery_percent = Some(pct);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        battery_percent.map(|pct| PowerStatus {
+            ac_online: if has_ac { ac_online } else { true },
+            battery_percent: pct,
         })
     }
-    pub fn query_bios_info() -> Option<SystemBiosInfo> { None }
-    pub fn query_gpu_names() -> Vec<String> { vec!["Mock GPU".to_string()] }
+
+    pub fn query_bios_info() -> Option<SystemBiosInfo> {
+        let manufacturer = std::fs::read_to_string("/sys/class/dmi/id/sys_vendor")
+            .ok()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        let product = std::fs::read_to_string("/sys/class/dmi/id/product_name")
+            .ok()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        let model = std::fs::read_to_string("/sys/class/dmi/id/product_version")
+            .ok()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if manufacturer.is_empty() && product.is_empty() && model.is_empty() {
+            None
+        } else {
+            Some(SystemBiosInfo {
+                manufacturer,
+                product,
+                model,
+            })
+        }
+    }
+
+    pub fn query_gpu_names() -> Vec<String> {
+        let mut gpus = Vec::new();
+        if let Ok(output) = std::process::Command::new("lspci").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let lower = line.to_lowercase();
+                if lower.contains("vga compatible controller:") || lower.contains("3d controller:") || lower.contains("display controller:") {
+                    if let Some(c_idx) = lower.find("controller:") {
+                        let name = line[c_idx + 11..].trim().to_string();
+                        if !name.is_empty() {
+                            gpus.push(name);
+                        }
+                    } else if let Some(last_colon) = line.rfind(':') {
+                        let name = line[last_colon + 1..].trim().to_string();
+                        if !name.is_empty() {
+                            gpus.push(name);
+                        }
+                    }
+                }
+            }
+        }
+        if gpus.is_empty() {
+            vec!["Unknown GPU".to_string()]
+        } else {
+            gpus
+        }
+    }
+
+    #[repr(C)]
+    struct Tm {
+        tm_sec: i32,
+        tm_min: i32,
+        tm_hour: i32,
+        tm_mday: i32,
+        tm_mon: i32,
+        tm_year: i32,
+        tm_wday: i32,
+        tm_yday: i32,
+        tm_isdst: i32,
+        tm_gmtoff: i64,
+        tm_zone: *const u8,
+    }
+
+    unsafe extern "C" {
+        fn time(time: *mut i64) -> i64;
+        fn localtime_r(timep: *const i64, result: *mut Tm) -> *mut Tm;
+    }
+
     pub fn get_local_time_string() -> String {
-        "2026-06-06 12:00:00".to_string()
+        unsafe {
+            let mut t = 0i64;
+            time(&mut t);
+            let mut tm = std::mem::zeroed::<Tm>();
+            if !localtime_r(&t, &mut tm).is_null() {
+                format!(
+                    "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                    tm.tm_year + 1900,
+                    tm.tm_mon + 1,
+                    tm.tm_mday,
+                    tm.tm_hour,
+                    tm.tm_min,
+                    tm.tm_sec
+                )
+            } else {
+                "2026-06-06 12:00:00".to_string()
+            }
+        }
     }
 }
 
